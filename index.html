@@ -1,0 +1,2673 @@
+<!--
+  Dental Appointment Notes Generator
+  
+  This single‑page application provides a structured way for dentists
+  to document patient encounters across a variety of appointment types.
+  The form adapts to the selected appointment and captures the core
+  elements recommended by North Carolina record‑keeping rules, such as
+  patient identification, diagnosis, medications, treatment rendered
+  and radiographs taken【467640716795675†L49-L70】.  Once the dentist
+  completes the fields, the application compiles a narrative note
+  summarising the visit.  The generated text can be reviewed and
+  copied into an electronic health record.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dental Appointment Notes Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      color: #333;
+    }
+
+    header {
+      background: #026aa7;
+      color: #fff;
+      padding: 1rem;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 1rem auto 3rem;
+      padding: 1rem;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    fieldset {
+      border: 1px solid #ddd;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 6px;
+    }
+
+    fieldset legend {
+      font-weight: bold;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    label span {
+      display: inline-block;
+      min-width: 180px;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 0.4rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .inline label {
+      margin-bottom: 0;
+      margin-right: 1rem;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    button.generate {
+      background: #026aa7;
+      color: #fff;
+      border: none;
+      padding: 0.7rem 1.2rem;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+
+    button.generate:hover {
+      background: #014f83;
+    }
+
+    #outputNote {
+      margin-top: 1rem;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 100%;
+      min-height: 220px;
+      padding: 0.5rem;
+      font-family: monospace;
+    }
+
+    @media (max-width: 600px) {
+      label span {
+        min-width: 120px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dental Appointment Notes Generator</h1>
+  </header>
+  <main>
+    <p>
+      This form helps you create thorough documentation for common dental
+      appointments. Begin by entering the basic details, choose the appointment
+      type and complete the prompted fields. When finished, click
+      <strong>Generate Note</strong> to compile your narrative. The output will
+      appear in the text area below and can be pasted into your electronic
+      record.
+    </p>
+    <form id="appointmentForm">
+      <fieldset>
+        <legend>Patient Information</legend>
+        <label>
+          <span>Patient full name:</span>
+          <input type="text" id="patientName" placeholder="e.g. Jane Doe" required>
+        </label>
+        <label>
+          <span>Date of appointment:</span>
+          <input type="date" id="appointmentDate" value="">
+        </label>
+        <label>
+          <span>Responsible party (optional):</span>
+          <input type="text" id="responsibleParty" placeholder="e.g. Parent/guardian">
+        </label>
+        <label>
+          <span>Health history update:</span>
+          <!-- Convert free text to a dropdown reflecting standardized medical history options -->
+          <select id="healthHistory">
+            <option value="">--Select--</option>
+            <option value="No changes. No significant findings. No contraindications to dental treatment.">No changes. No significant findings. No contraindications to dental treatment.</option>
+            <option value="Patient reports no significant changes in medical history.">Patient reports no significant changes in medical history.</option>
+            <option value="Medical history updated (see medical history form).">Medical history updated (see medical history form).</option>
+          </select>
+        </label>
+
+      <!-- Chief complaint -->
+      <label>
+        <span>Chief complaint:</span>
+        <textarea id="chiefComplaint" placeholder="Patient's chief complaint in their own words"></textarea>
+      </label>
+
+        <!-- Vital signs -->
+        <label>
+          <span>Blood pressure (mmHg):</span>
+          <input type="text" id="vital-bp" placeholder="e.g. 120/80">
+        </label>
+        <label>
+          <span>Pulse (bpm):</span>
+          <input type="number" id="vital-pulse" min="0" placeholder="e.g. 72">
+        </label>
+
+        <!-- Provider information -->
+        <label>
+          <span>Provider name &amp; credentials:</span>
+          <input type="text" id="providerName" placeholder="e.g. John Smith, DDS">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Appointment Type</legend>
+        <label>
+          <span>Select appointment:</span>
+          <select id="appointmentType" required>
+            <option value="">--Please choose--</option>
+            <option value="filling">Filling / Restorative</option>
+            <option value="extraction">Extraction</option>
+            <option value="crownCement">Crown Cementation</option>
+            <option value="invisalignStart">Invisalign Start</option>
+            <option value="invisalignRecheck">Invisalign Recheck</option>
+            <option value="invisalignAttachment">Invisalign Attachment / Bonding</option>
+            <option value="prp">Platelet‑rich Plasma (PRP)</option>
+            <option value="consultation">Consultation</option>
+            <option value="limitedExam">Limited / Emergency Exam</option>
+            <option value="implant">Implant Placement</option>
+
+            <!-- New appointment types -->
+            <option value="rootCanal">Root Canal Treatment</option>
+            <option value="crownPrep">Crown Preparation</option>
+            <option value="dentureDelivery">Dentures Delivery</option>
+            <option value="dentureFollowUp">Denture Follow‑up</option>
+            <option value="dentureAdjust">Denture Adjustment</option>
+            <option value="completeExam">Complete Exam</option>
+            <option value="invisalignRecords">Invisalign Records Appointment</option>
+            <option value="occlusalGuard">Occlusal Guard Delivery</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <!-- Section: Filling / Restorative -->
+      <fieldset id="section-filling" class="hidden appointment-section">
+        <legend>Filling / Restorative Details</legend>
+        <label>
+          <span>Anesthesia used:</span>
+          <!-- Updated options include cartridge volume, concentration, mg and epinephrine content per carpule -->
+          <select id="fill-anesthesia">
+            <option value="lidocaine" data-mg="34" data-epi="0.017">1.7 mL 2% Lidocaine (34 mg) with 1:100,000 epinephrine (0.017 mg)</option>
+            <option value="articaine" data-mg="68" data-epi="0.017">1.7 mL 4% Articaine (68 mg) with 1:100,000 epinephrine (0.017 mg)</option>
+            <option value="mepivacaine" data-mg="51" data-epi="0">1.7 mL 3% Mepivacaine (51 mg) without epinephrine</option>
+            <option value="prilocaine" data-mg="68" data-epi="0.0085">1.7 mL 4% Prilocaine (68 mg) with 1:200,000 epinephrine (0.0085 mg)</option>
+            <option value="none" data-mg="0" data-epi="0">None</option>
+          </select>
+        </label>
+        <label>
+          <span>Injection technique:</span>
+          <select id="fill-injection">
+            <option value="infiltration">Infiltration</option>
+            <option value="block">Nerve block</option>
+            <option value="both">Both infiltration and block</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <label>
+          <span>Topical anesthetic applied:</span>
+          <select id="fill-topical">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </label>
+        <label>
+          <span>Topical anesthetic type:</span>
+          <select id="fill-topical-type">
+            <option value="none">None</option>
+            <option value="20% benzocaine gel">20% benzocaine gel</option>
+            <option value="Cetacaine spray">Cetacaine spray</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Number of carpules:</span>
+          <input type="number" id="fill-carpules" min="0" step="0.5" value="1">
+        </label>
+        <label>
+          <span>Isolation method(s):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="fill-isolation-cotton" value="cotton roll isolation"> Cotton rolls</label>
+            <label><input type="checkbox" id="fill-isolation-isovac" value="Isovac"> Isovac</label>
+            <label><input type="checkbox" id="fill-isolation-rubberdam" value="rubber dam"> Rubber dam</label>
+          </div>
+        </label>
+        <label>
+          <span>Bonding agent:</span>
+          <select id="fill-bonding">
+            <option value="OptiBond">OptiBond (default)</option>
+            <option value="Scotchbond">Scotchbond</option>
+            <option value="Clearfil SE">Clearfil SE</option>
+            <option value="Prime &amp; Bond">Prime &amp; Bond</option>
+          </select>
+        </label>
+
+        <!-- Radiographic interpretation for restorative appointments (from template) -->
+        <label>
+          <span>Radiographic interpretation (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="fill-radio-decay" value="decayed"> Decayed</label>
+            <label><input type="checkbox" id="fill-radio-fractured" value="fractured"> Fractured</label>
+            <label><input type="checkbox" id="fill-radio-root" value="root tip remaining"> Root tip remaining</label>
+            <label><input type="checkbox" id="fill-radio-parl" value="periapical radiolucency"> PARL</label>
+            <label><input type="checkbox" id="fill-radio-bone" value="bone loss"> Bone loss</label>
+            <label><input type="checkbox" id="fill-radio-third" value="third molar"> Third Molar</label>
+            <label><input type="checkbox" id="fill-radio-impacted" value="impacted tooth"> Impacted tooth</label>
+          </div>
+        </label>
+
+        <!-- Pre‑operative findings and caries depth for restorative appointments -->
+        <label>
+          <span>Pre‑operative findings (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="fill-preop-caries" value="visible caries"> Visible caries on noted tooth/teeth</label>
+            <label><input type="checkbox" id="fill-preop-restoration" value="existing restoration"> Existing restoration present</label>
+            <label><input type="checkbox" id="fill-preop-no-path" value="no fracture or soft tissue pathology"> No fracture or soft tissue pathology</label>
+          </div>
+        </label>
+        <label>
+          <span>Caries depth:</span>
+          <select id="fill-preop-depth">
+            <option value="">--Select--</option>
+            <option value="Shallow">Shallow</option>
+            <option value="Moderate">Moderate</option>
+            <option value="Deep (close to pulp)">Deep (close to pulp)</option>
+          </select>
+        </label>
+
+        <!-- Composite material selection -->
+        <label>
+          <span>Composite material (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="fill-comp-A1" value="TPH Spectra A1"> TPH Spectra A1</label>
+            <label><input type="checkbox" id="fill-comp-A2" value="TPH Spectra A2"> TPH Spectra A2</label>
+            <label><input type="checkbox" id="fill-comp-Beautifil" value="Beautifil Flow A2"> Beautifil Flow A2</label>
+            <label><input type="checkbox" id="fill-comp-other" value="other"> Other</label>
+            <input type="text" id="fill-comp-other-text" class="inline" placeholder="Specify other composite material" style="max-width: 200px;">
+          </div>
+          <div style="font-size:0.9em; margin-top:4px;">Shade selected prior to isolation.</div>
+        </label>
+
+        <!-- Finishing and occlusion checks -->
+        <label>
+          <span>Contacts flossed and checked:</span>
+          <select id="fill-flossed">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Occlusion adjusted:</span>
+          <select id="fill-occlusion">
+            <option value="yes">Yes</option>
+            <option value="no" selected>No</option>
+          </select>
+        </label>
+        <label>
+          <span>X‑rays taken:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="fill-xray-none" value="None"> None</label>
+            <label><input type="checkbox" id="fill-xray-bw" value="Bitewing"> Bitewing(s)</label>
+            <label><input type="checkbox" id="fill-xray-pa" value="Periapical"> Periapical(s)</label>
+            <label><input type="checkbox" id="fill-xray-pan" value="Panoramic"> Panoramic</label>
+          </div>
+        </label>
+        <label>
+          <span>Diagnosis:</span>
+          <select id="fill-diagnosis">
+            <option value="Caries">Caries/decay</option>
+            <option value="Reversible pulpitis">Reversible pulpitis</option>
+            <option value="Irreversible pulpitis">Irreversible pulpitis</option>
+            <option value="Cracked tooth">Cracked tooth</option>
+            <option value="Defective restoration">Defective restoration</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        <!-- Multi‑tooth input: allow up to three individual tooth entries with surfaces, then a free‑text area -->
+        <div id="fill-tooth-entries">
+          <!-- Tooth entry 1 (always visible) -->
+          <div class="tooth-entry" id="fill-tooth-entry-1">
+            <label>
+              <span>Tooth number:</span>
+              <input type="text" id="fill-tooth1" placeholder="e.g. 3">
+            </label>
+            <label>
+              <span>Surface(s):</span>
+              <div class="inline">
+                <label><input type="checkbox" id="fill-surface1-O" value="occlusal"> Occlusal</label>
+                <label><input type="checkbox" id="fill-surface1-M" value="mesial"> Mesial</label>
+                <label><input type="checkbox" id="fill-surface1-D" value="distal"> Distal</label>
+                <label><input type="checkbox" id="fill-surface1-B" value="buccal"> Buccal</label>
+                <label><input type="checkbox" id="fill-surface1-L" value="lingual"> Lingual</label>
+              </div>
+            </label>
+          </div>
+          <!-- Tooth entry 2 (initially hidden) -->
+          <div class="tooth-entry hidden" id="fill-tooth-entry-2">
+            <label>
+              <span>Tooth number:</span>
+              <input type="text" id="fill-tooth2" placeholder="e.g. 14">
+            </label>
+            <label>
+              <span>Surface(s):</span>
+              <div class="inline">
+                <label><input type="checkbox" id="fill-surface2-O" value="occlusal"> Occlusal</label>
+                <label><input type="checkbox" id="fill-surface2-M" value="mesial"> Mesial</label>
+                <label><input type="checkbox" id="fill-surface2-D" value="distal"> Distal</label>
+                <label><input type="checkbox" id="fill-surface2-B" value="buccal"> Buccal</label>
+                <label><input type="checkbox" id="fill-surface2-L" value="lingual"> Lingual</label>
+              </div>
+            </label>
+          </div>
+          <!-- Tooth entry 3 (initially hidden) -->
+          <div class="tooth-entry hidden" id="fill-tooth-entry-3">
+            <label>
+              <span>Tooth number:</span>
+              <input type="text" id="fill-tooth3" placeholder="e.g. 30">
+            </label>
+            <label>
+              <span>Surface(s):</span>
+              <div class="inline">
+                <label><input type="checkbox" id="fill-surface3-O" value="occlusal"> Occlusal</label>
+                <label><input type="checkbox" id="fill-surface3-M" value="mesial"> Mesial</label>
+                <label><input type="checkbox" id="fill-surface3-D" value="distal"> Distal</label>
+                <label><input type="checkbox" id="fill-surface3-B" value="buccal"> Buccal</label>
+                <label><input type="checkbox" id="fill-surface3-L" value="lingual"> Lingual</label>
+              </div>
+            </label>
+          </div>
+        </div>
+        <button type="button" id="fill-add-tooth" class="generate">Add another tooth</button>
+        <!-- Free text area for more than three teeth -->
+        <label id="fill-more-teeth-container" class="hidden">
+          <span>Additional teeth and surfaces:</span>
+          <textarea id="fill-more-teeth" placeholder="List additional tooth numbers and surfaces (e.g. 2-DO; 5-OL)"></textarea>
+        </label>
+        <label>
+          <span>Proximity to pulp:</span>
+          <select id="fill-pulp">
+            <option value="not close">Not close to pulp</option>
+            <option value="close">Close to pulp</option>
+            <option value="exposed">Pulp exposed</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional findings/symptoms:</span>
+          <textarea id="fill-symptoms" placeholder="Sensitivity, pain on biting, etc."></textarea>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="fill-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Extraction -->
+      <fieldset id="section-extraction" class="hidden appointment-section">
+        <legend>Extraction Details</legend>
+        <label>
+          <span>Extraction type:</span>
+          <select id="ext-type">
+            <option value="simple">Simple extraction</option>
+            <option value="surgical">Surgical extraction</option>
+            <option value="eruption">Erupted tooth removal</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <!-- New fields to capture clinical assessment and diagnoses based on the provided template -->
+        <!-- Assessment & observations with checkboxes for palpation, percussion, mobility and endodontic tests -->
+        <label>
+          <span>Assessment &amp; observations:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="ext-assess-palpation-pos" value="Palpation positive"> Palpation positive</label>
+            <label><input type="checkbox" id="ext-assess-palpation-neg" value="Palpation negative"> Palpation negative</label>
+            <label><input type="checkbox" id="ext-assess-percussion-pos" value="Percussion positive"> Percussion positive</label>
+            <label><input type="checkbox" id="ext-assess-percussion-neg" value="Percussion negative"> Percussion negative</label>
+            <label><input type="checkbox" id="ext-assess-mobility-1" value="Mobility class I"> Mobility class I</label>
+            <label><input type="checkbox" id="ext-assess-mobility-2" value="Mobility class II"> Mobility class II</label>
+            <label><input type="checkbox" id="ext-assess-mobility-3" value="Mobility class III"> Mobility class III</label>
+            <label><input type="checkbox" id="ext-assess-endo-lingering" value="Lingering pain"> Endo test: lingering pain</label>
+            <label><input type="checkbox" id="ext-assess-endo-no" value="No lingering pain"> Endo test: no lingering pain</label>
+          </div>
+        </label>
+        <!-- Free text for additional assessment notes -->
+        <label>
+          <span>Assessment details:</span>
+          <textarea id="ext-assessment" placeholder="Additional observations"></textarea>
+        </label>
+        <label>
+          <span>Pulpal diagnosis:</span>
+          <select id="ext-pulp-diagnosis">
+            <option value="">--Select--</option>
+            <option value="Normal pulp">Normal pulp</option>
+            <option value="Reversible pulpitis">Reversible pulpitis</option>
+            <option value="Symptomatic irreversible pulpitis">Symptomatic irreversible pulpitis</option>
+            <option value="Asymptomatic irreversible pulpitis">Asymptomatic irreversible pulpitis</option>
+            <option value="Pulp necrosis">Pulp necrosis</option>
+            <option value="Previously treated">Previously treated</option>
+          </select>
+        </label>
+        <label>
+          <span>Apical diagnosis:</span>
+          <select id="ext-apical-diagnosis">
+            <option value="">--Select--</option>
+            <option value="Normal apical tissues">Normal apical tissues</option>
+            <option value="Symptomatic apical periodontitis">Symptomatic apical periodontitis</option>
+            <option value="Asymptomatic apical periodontitis">Asymptomatic apical periodontitis</option>
+            <option value="Chronic apical abscess">Chronic apical abscess</option>
+            <option value="Acute apical abscess">Acute apical abscess</option>
+          </select>
+        </label>
+
+        <!-- Radiographic interpretation for extraction appointments -->
+        <label>
+          <span>Radiographic interpretation (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="ext-radio-decay" value="decayed"> Decayed</label>
+            <label><input type="checkbox" id="ext-radio-fractured" value="fractured"> Fractured</label>
+            <label><input type="checkbox" id="ext-radio-root" value="root tip remaining"> Root tip remaining</label>
+            <label><input type="checkbox" id="ext-radio-parl" value="periapical radiolucency"> PARL</label>
+            <label><input type="checkbox" id="ext-radio-bone" value="bone loss"> Bone loss</label>
+            <label><input type="checkbox" id="ext-radio-third" value="third molar"> Third Molar</label>
+            <label><input type="checkbox" id="ext-radio-impacted" value="impacted tooth"> Impacted tooth</label>
+          </div>
+        </label>
+        <label>
+          <span>Topical anesthetic type:</span>
+          <select id="ext-topical-type">
+            <option value="none">None</option>
+            <option value="20% benzocaine gel">20% benzocaine gel</option>
+            <option value="Cetacaine spray">Cetacaine spray</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Tooth number(s):</span>
+          <input type="text" id="ext-teeth" placeholder="e.g. 17, 32">
+        </label>
+        <label>
+          <span>Anesthesia used:</span>
+          <select id="ext-anesthesia">
+            <option value="lidocaine" data-mg="34" data-epi="0.017">1.7 mL 2% Lidocaine (34 mg) with 1:100,000 epinephrine (0.017 mg)</option>
+            <option value="articaine" data-mg="68" data-epi="0.017">1.7 mL 4% Articaine (68 mg) with 1:100,000 epinephrine (0.017 mg)</option>
+            <option value="mepivacaine" data-mg="51" data-epi="0">1.7 mL 3% Mepivacaine (51 mg) without epinephrine</option>
+            <option value="prilocaine" data-mg="68" data-epi="0.0085">1.7 mL 4% Prilocaine (68 mg) with 1:200,000 epinephrine (0.0085 mg)</option>
+            <option value="none" data-mg="0" data-epi="0">None</option>
+          </select>
+        </label>
+        <label>
+          <span>Number of carpules:</span>
+          <input type="number" id="ext-carpules" min="0" step="0.5" value="1">
+        </label>
+        <label>
+          <span>Sedation/nitrous used:</span>
+          <select id="ext-sedation">
+            <option value="none">None</option>
+            <option value="nitrous">Nitrous oxide/oxygen</option>
+            <option value="oral sedation">Oral sedation</option>
+            <option value="IV sedation">IV sedation</option>
+          </select>
+        </label>
+
+        <!-- Additional extraction fields based on clinical note template -->
+        <label>
+          <span>Topical anesthetic applied:</span>
+          <select id="ext-topical">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </label>
+        <label>
+          <span>Injection technique:</span>
+          <select id="ext-injection">
+            <option value="infiltration">Infiltration</option>
+            <option value="block">Nerve block</option>
+            <option value="both">Both infiltration and block</option>
+          </select>
+        </label>
+        <label>
+          <span>Treatment options offered:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="ext-option-rct" value="Root Canal Therapy"> Root Canal Therapy</label>
+            <label><input type="checkbox" id="ext-option-ext" value="Extraction"> Extraction</label>
+            <label><input type="checkbox" id="ext-option-other" value="Other"> Other</label>
+          </div>
+        </label>
+        <label>
+          <span>Patient chose:</span>
+          <select id="ext-choice">
+            <option value="">--Select--</option>
+            <option value="Root Canal Therapy">Root Canal Therapy</option>
+            <option value="Extraction">Extraction</option>
+            <option value="Observation">Observation</option>
+            <option value="Referral">Referral</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Clearance letter required:</span>
+          <select id="ext-clearance">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </label>
+        <label>
+          <span>Consent obtained:</span>
+          <select id="ext-consent">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Treatment plan:</span>
+          <input type="text" id="ext-treatmentplan" placeholder="e.g. Extraction">
+        </label>
+        <label>
+          <span>Prescription(s):</span>
+          <textarea id="ext-prescription" placeholder="e.g. Amoxicillin 500 mg 3×/day for 7 days; Ibuprofen 800 mg..."></textarea>
+        </label>
+        <label>
+          <span>Next visit / follow‑up:</span>
+          <textarea id="ext-followup" placeholder="e.g. Follow up in 1 week"></textarea>
+        </label>
+
+        <!-- Prescription selections for limited/emergency cases -->
+        <label>
+          <span>Antibiotic prescribed:</span>
+          <select id="ext-antibiotic">
+            <option value="none">None</option>
+            <option value="Amoxicillin">Amoxicillin 500 mg TID ×7 days (21 capsules, no refills)</option>
+            <option value="Clindamycin">Clindamycin 300 mg TID ×7 days (21 capsules, no refills)</option>
+          </select>
+        </label>
+        <!-- Analgesics: allow multiple selections -->
+        <label>
+          <span>Pain medications:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="ext-analgesic-acet500" value="Acetaminophen 500 mg"> Acetaminophen 500 mg</label>
+            <label><input type="checkbox" id="ext-analgesic-acet325" value="Acetaminophen 325 mg"> Acetaminophen 325 mg</label>
+            <label><input type="checkbox" id="ext-analgesic-ibu800" value="Ibuprofen 800 mg"> Ibuprofen 800 mg</label>
+          </div>
+        </label>
+        <label>
+          <span>Instruments used:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="ext-instrument-elevator" value="elevator"> Elevator</label>
+            <label><input type="checkbox" id="ext-instrument-forceps" value="forceps"> Forceps</label>
+            <label><input type="checkbox" id="ext-instrument-burr" value="handpiece/bur"> Handpiece/Bur</label>
+            <label><input type="checkbox" id="ext-instrument-curette" value="curette"> Curette</label>
+          </div>
+        </label>
+        <label>
+          <span>Sectioning required:</span>
+          <select id="ext-sectioning">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </label>
+        <label>
+          <span>Complications:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="ext-complications-none" value="none"> None</label>
+            <label><input type="checkbox" id="ext-complications-root" value="root fracture"> Root fracture</label>
+            <label><input type="checkbox" id="ext-complications-bone" value="bone fracture"> Alveolar bone fracture</label>
+            <label><input type="checkbox" id="ext-complications-sinus" value="sinus exposure"> Sinus exposure</label>
+            <label><input type="checkbox" id="ext-complications-other" value="other"> Other</label>
+          </div>
+        </label>
+        <label>
+          <span>Sutures placed:</span>
+          <select id="ext-sutures">
+            <option value="none">None</option>
+            <option value="chromic gut">Chromic gut</option>
+            <option value="resorbable">Resorbable</option>
+            <option value="silk">Silk</option>
+          </select>
+        </label>
+        <label>
+          <span>Post‑op instructions given:</span>
+          <select id="ext-postop">
+            <option value="standard">Standard (bleeding control, no rinsing, soft diet)</option>
+            <option value="special">Special (sinus precautions, graft instructions)</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="ext-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Crown Cementation -->
+      <fieldset id="section-crownCement" class="hidden appointment-section">
+        <legend>Crown Cementation Details</legend>
+        <label>
+          <span>Tooth number:</span>
+          <input type="text" id="cement-tooth" placeholder="e.g. 30">
+        </label>
+        <label>
+          <span>Crown type:</span>
+          <select id="cement-crownType">
+            <option value="zirconia">Zirconia</option>
+            <option value="PFM">Porcelain‑fused‑to‑metal</option>
+            <option value="gold">Gold alloy</option>
+            <option value="e.max">Lithium disilicate (e.max)</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Fit check:</span>
+          <select id="cement-fit">
+            <option value="good">Good</option>
+            <option value="adjustment needed">Adjustment needed</option>
+          </select>
+        </label>
+        <label>
+          <span>Occlusion adjusted:</span>
+          <select id="cement-occlusion">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Cement used:</span>
+          <select id="cement-type">
+            <option value="RelyX Luting">RelyX Luting</option>
+            <option value="FujiCEM">FujiCEM</option>
+            <option value="TempBond">TempBond (temporary)</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Radiograph taken after cementation:</span>
+          <select id="cement-xray">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="cement-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Invisalign Start -->
+      <fieldset id="section-invisalignStart" class="hidden appointment-section">
+        <legend>Invisalign Start Details</legend>
+        <label>
+          <span>Attachments placed:</span>
+          <select id="invstart-attachments">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Interproximal reduction (IPR) performed:</span>
+          <select id="invstart-ipr">
+            <option value="none">None</option>
+            <option value="0.1 mm">0.1 mm</option>
+            <option value="0.2 mm">0.2 mm</option>
+            <option value="0.3 mm">0.3 mm</option>
+            <option value="0.5 mm">0.5 mm</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Number of aligners dispensed:</span>
+          <input type="number" id="invstart-aligners" min="1" value="5">
+        </label>
+        <label>
+          <span>Next follow‑up (weeks):</span>
+          <input type="number" id="invstart-followup" min="1" value="6">
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="invstart-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Invisalign Recheck -->
+      <fieldset id="section-invisalignRecheck" class="hidden appointment-section">
+        <legend>Invisalign Recheck Details</legend>
+        <label>
+          <span>Current tray number:</span>
+          <input type="number" id="invrecheck-tray" min="1" value="1">
+        </label>
+        <label>
+          <span>Patient compliance:</span>
+          <select id="invrecheck-compliance">
+            <option value="excellent">Excellent</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="poor">Poor</option>
+          </select>
+        </label>
+        <label>
+          <span>Attachments status:</span>
+          <select id="invrecheck-attachments">
+            <option value="all intact">All intact</option>
+            <option value="some lost">Some lost/broken</option>
+          </select>
+        </label>
+        <label>
+          <span>IPR performed today:</span>
+          <select id="invrecheck-ipr">
+            <option value="none">None</option>
+            <option value="0.1 mm">0.1 mm</option>
+            <option value="0.2 mm">0.2 mm</option>
+            <option value="0.3 mm">0.3 mm</option>
+            <option value="0.5 mm">0.5 mm</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="invrecheck-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Invisalign Attachment/Bonding -->
+      <fieldset id="section-invisalignAttachment" class="hidden appointment-section">
+        <legend>Invisalign Attachment / Bonding Details</legend>
+        <label>
+          <span>Number of attachments placed:</span>
+          <input type="number" id="invatt-count" min="0" value="4">
+        </label>
+        <label>
+          <span>Composite type used:</span>
+          <select id="invatt-composite">
+            <option value="Filtek Supreme">Filtek Supreme</option>
+            <option value="Tetric EvoFlow">Tetric EvoFlow</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Next aligner delivered:</span>
+          <input type="number" id="invatt-nextAligner" min="1" value="1">
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="invatt-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Invisalign Records Appointment -->
+      <fieldset id="section-invisalignRecords" class="hidden appointment-section">
+        <legend>Invisalign Records Appointment Details</legend>
+        <label>
+          <span>Records taken (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="invrec-records-pan" value="panoramic radiograph"> Panoramic X‑ray</label>
+            <label><input type="checkbox" id="invrec-records-photo" value="photographs"> Photographs</label>
+            <label><input type="checkbox" id="invrec-records-itero" value="iTero scan"> iTero scan</label>
+            <label><input type="checkbox" id="invrec-records-impressions" value="impressions"> Impressions</label>
+          </div>
+        </label>
+        <label>
+          <span>Next follow‑up (weeks):</span>
+          <input type="number" id="invrec-followup" min="1" value="6">
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="invrec-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: PRP -->
+      <fieldset id="section-prp" class="hidden appointment-section">
+        <legend>PRP Procedure Details</legend>
+        <label>
+          <span>Reason for PRP:</span>
+          <select id="prp-reason">
+            <option value="bone graft">Bone graft augmentation</option>
+            <option value="soft tissue healing">Soft tissue healing</option>
+            <option value="implant augmentation">Implant augmentation</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Was venipuncture successful on first attempt?</span>
+          <select id="prp-venipuncture">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Volume of blood drawn (ml):</span>
+          <input type="number" id="prp-volume" min="5" value="20">
+        </label>
+        <label>
+          <span>Patient tolerance:</span>
+          <select id="prp-tolerance">
+            <option value="well tolerated">Well tolerated</option>
+            <option value="mild discomfort">Mild discomfort</option>
+            <option value="poorly tolerated">Poorly tolerated</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="prp-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Consultation -->
+      <fieldset id="section-consultation" class="hidden appointment-section">
+        <legend>Consultation Details</legend>
+        <label>
+          <span>Chief complaint / reason for visit:</span>
+          <textarea id="consult-chief" placeholder="Patient's chief complaint"></textarea>
+        </label>
+        <label>
+          <span>History of present illness:</span>
+          <textarea id="consult-history"></textarea>
+        </label>
+        <label>
+          <span>Clinical findings:</span>
+          <textarea id="consult-findings" placeholder="Clinical exam findings"></textarea>
+        </label>
+        <label>
+          <span>Radiographs taken:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="consult-xray-none" value="None"> None</label>
+            <label><input type="checkbox" id="consult-xray-bw" value="Bitewing"> Bitewing(s)</label>
+            <label><input type="checkbox" id="consult-xray-pa" value="Periapical"> Periapical(s)</label>
+            <label><input type="checkbox" id="consult-xray-pan" value="Panoramic"> Panoramic</label>
+            <label><input type="checkbox" id="consult-xray-ct" value="CBCT"> CBCT</label>
+          </div>
+        </label>
+        <label>
+          <span>Diagnosis:</span>
+          <textarea id="consult-diagnosis" placeholder="Summary of diagnoses"></textarea>
+        </label>
+        <label>
+          <span>Treatment options discussed:</span>
+          <textarea id="consult-options"></textarea>
+        </label>
+        <label>
+          <span>Informed consent obtained:</span>
+          <select id="consult-consent">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="consult-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Implant Placement -->
+      <fieldset id="section-implant" class="hidden appointment-section">
+        <legend>Implant Placement Details</legend>
+        <label>
+          <span>Implant site(s):</span>
+          <input type="text" id="implant-sites" placeholder="e.g. 4, 13">
+        </label>
+        <label>
+          <span>Implant system/brand:</span>
+          <select id="implant-system">
+            <option value="Nobel Biocare">Nobel Biocare</option>
+            <option value="Straumann">Straumann</option>
+            <option value="BioHorizons">BioHorizons</option>
+            <option value="Astra Tech">Astra Tech</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Surgical guide used:</span>
+          <select id="implant-guide">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Bone graft placed:</span>
+          <select id="implant-graft">
+            <option value="none">None</option>
+            <option value="allograft">Allograft</option>
+            <option value="xenograft">Xenograft</option>
+            <option value="autograft">Autograft</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Membrane used:</span>
+          <select id="implant-membrane">
+            <option value="none">None</option>
+            <option value="collagen">Collagen</option>
+            <option value="ptfe">PTFE</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Torque value (Ncm):</span>
+          <input type="number" id="implant-torque" min="0" value="35">
+        </label>
+        <label>
+          <span>Healing abutment placed:</span>
+          <select id="implant-healing">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Sutures placed:</span>
+          <select id="implant-sutures">
+            <option value="none">None</option>
+            <option value="chromic gut">Chromic gut</option>
+            <option value="resorbable">Resorbable</option>
+            <option value="silk">Silk</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Post‑op instructions given:</span>
+          <select id="implant-postop">
+            <option value="standard">Standard implant instructions</option>
+            <option value="special">Special (sinus graft precautions, etc.)</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="implant-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Root Canal Treatment -->
+      <fieldset id="section-rootCanal" class="hidden appointment-section">
+        <legend>Root Canal Treatment Details</legend>
+        <label>
+          <span>Tooth number(s):</span>
+          <input type="text" id="rct-teeth" placeholder="e.g. 8, 9">
+        </label>
+
+        <!-- Pulpal and apical diagnosis -->
+        <label>
+          <span>Pulpal diagnosis (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-pulp-necrotic" value="Necrotic pulp"> Necrotic pulp</label>
+            <label><input type="checkbox" id="rct-pulp-sympIrrev" value="Symptomatic irreversible pulpitis"> Symptomatic irreversible pulpitis</label>
+            <label><input type="checkbox" id="rct-pulp-asympIrrev" value="Asymptomatic irreversible pulpitis"> Asymptomatic irreversible pulpitis</label>
+            <label><input type="checkbox" id="rct-pulp-necrosis" value="Pulp necrosis"> Pulp necrosis</label>
+            <label><input type="checkbox" id="rct-pulp-treated" value="Previously treated"> Previously treated</label>
+          </div>
+        </label>
+        <label>
+          <span>Periapical diagnosis (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-apical-symp" value="Symptomatic apical periodontitis"> Symptomatic apical periodontitis</label>
+            <label><input type="checkbox" id="rct-apical-asymp" value="Asymptomatic apical periodontitis"> Asymptomatic apical periodontitis</label>
+            <label><input type="checkbox" id="rct-apical-chronic" value="Chronic apical abscess"> Chronic apical abscess</label>
+            <label><input type="checkbox" id="rct-apical-acute" value="Acute apical abscess"> Acute apical abscess</label>
+          </div>
+        </label>
+        <label>
+          <span>Radiographic findings (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-radio-radiolucency" value="periapical radiolucency"> Periapical radiolucency</label>
+            <label><input type="checkbox" id="rct-radio-PDL" value="widened periodontal ligament space"> Widened PDL</label>
+            <label><input type="checkbox" id="rct-radio-other" value="other"> Other</label>
+          </div>
+        </label>
+        <label id="rct-radio-otherText-container" class="hidden">
+          <span>If other, specify:</span>
+          <input type="text" id="rct-radio-otherText" placeholder="Describe radiographic findings">
+        </label>
+        <label>
+          <span>Treatment options discussed (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-opt-rct" value="Root canal therapy"> Root canal therapy</label>
+            <label><input type="checkbox" id="rct-opt-extraction" value="Extraction"> Extraction</label>
+            <label><input type="checkbox" id="rct-opt-none" value="No treatment at this time"> No treatment at this time</label>
+          </div>
+        </label>
+        <label>
+          <span>Patient consent provided?</span>
+          <select id="rct-consent">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Access prepared with:</span>
+          <input type="text" id="rct-access" placeholder="e.g. Endo access bur">
+        </label>
+        <label>
+          <span>Magnification used (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-mag-loupes" value="Surgical loupes"> Surgical loupes</label>
+            <label><input type="checkbox" id="rct-mag-microscope" value="Microscope"> Microscope</label>
+          </div>
+        </label>
+        <label>
+          <span>Instrumentation (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-instr-hand" value="Hand files"> Hand files</label>
+            <label><input type="checkbox" id="rct-instr-rotary" value="Rotary files"> Rotary files</label>
+          </div>
+        </label>
+        <label>
+          <span>Master apical file size & reference:</span>
+          <input type="text" id="rct-instr-size" placeholder="e.g. 40/0.04/18 mm">
+        </label>
+        <label>
+          <span>Irrigants used (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-irrigant-NaOCl" value="Sodium hypochlorite"> Sodium hypochlorite</label>
+            <label><input type="checkbox" id="rct-irrigant-EDTA" value="EDTA"> EDTA</label>
+            <label><input type="checkbox" id="rct-irrigant-Chlorhexidine" value="Chlorhexidine"> Chlorhexidine</label>
+            <label><input type="checkbox" id="rct-irrigant-Saline" value="Saline"> Saline</label>
+            <label><input type="checkbox" id="rct-irrigant-other" value="Other"> Other</label>
+          </div>
+        </label>
+        <label id="rct-irrigant-otherText-container" class="hidden">
+          <span>If other irrigant, specify:</span>
+          <input type="text" id="rct-irrigant-otherText" placeholder="Describe irrigant">
+        </label>
+        <label>
+          <span>Irrigation activation method:</span>
+          <select id="rct-irrigationActivation">
+            <option value="manual">Manual</option>
+            <option value="ultrasonic">Ultrasonic</option>
+          </select>
+        </label>
+        <label>
+          <span>Radiographs taken (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-xray-working" value="working length radiograph"> Working length</label>
+            <label><input type="checkbox" id="rct-xray-masterCone" value="master cone radiograph"> Master cone</label>
+            <label><input type="checkbox" id="rct-xray-final" value="final obturation radiograph"> Final obturation</label>
+          </div>
+        </label>
+        <label>
+          <span>Next visit / follow‑up (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-follow-checkin" value="1-week follow-up/phone check-in"> 1‑week follow‑up/phone check‑in</label>
+            <label><input type="checkbox" id="rct-follow-definitive" value="Definitive restoration ASAP"> Definitive restoration ASAP</label>
+            <label><input type="checkbox" id="rct-follow-other" value="Other"> Other</label>
+          </div>
+        </label>
+        <label id="rct-follow-otherText-container" class="hidden">
+          <span>If other follow‑up, specify:</span>
+          <input type="text" id="rct-follow-otherText" placeholder="Describe follow‑up">
+        </label>
+        <label>
+          <span>Anesthesia used:</span>
+          <select id="rct-anesthesia">
+            <option value="lidocaine" data-mg="34" data-epi="0.017">1.7 mL 2% Lidocaine (34 mg) with 1:100,000 epinephrine (0.017 mg)</option>
+            <option value="articaine" data-mg="68" data-epi="0.017">1.7 mL 4% Articaine (68 mg) with 1:100,000 epinephrine (0.017 mg)</option>
+            <option value="mepivacaine" data-mg="51" data-epi="0">1.7 mL 3% Mepivacaine (51 mg) without epinephrine</option>
+            <option value="prilocaine" data-mg="68" data-epi="0.0085">1.7 mL 4% Prilocaine (68 mg) with 1:200,000 epinephrine (0.0085 mg)</option>
+            <option value="none" data-mg="0" data-epi="0">None</option>
+          </select>
+        </label>
+        <label>
+          <span>Number of carpules:</span>
+          <input type="number" id="rct-carpules" min="0" step="0.5" value="1">
+        </label>
+        <label>
+          <span>Isolation method:</span>
+          <select id="rct-isolation">
+            <option value="rubber dam">Rubber dam</option>
+            <option value="isovac">Isovac</option>
+            <option value="cotton rolls">Cotton rolls</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <label>
+          <span>Working length determination method:</span>
+          <select id="rct-working">
+            <option value="apex locator">Electronic apex locator</option>
+            <option value="radiograph">Radiograph</option>
+            <option value="both">Both</option>
+          </select>
+        </label>
+        <label>
+          <span>Obturation technique:</span>
+          <select id="rct-obturation">
+            <option value="gutta-percha lateral condensation">Gutta‑percha lateral condensation</option>
+            <option value="gutta-percha warm vertical">Gutta‑percha warm vertical compaction</option>
+            <option value="single cone">Single cone</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Sealer used:</span>
+          <select id="rct-sealer">
+            <option value="AH Plus">AH Plus</option>
+            <option value="Resilon">Resilon</option>
+            <option value="Bioceramic">Bioceramic</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Temporary restoration material:</span>
+          <select id="rct-tempMaterial">
+            <option value="Cavit">Cavit</option>
+            <option value="IRM">IRM</option>
+            <option value="glass ionomer">Glass ionomer</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Post‑operative instructions given:</span>
+          <select id="rct-postop">
+            <option value="standard">Standard endo instructions</option>
+            <option value="special">Special (analgesic, antibiotics)</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="rct-notes"></textarea>
+        </label>
+
+        <!-- Prescription selections for endodontic cases -->
+        <label>
+          <span>Antibiotic prescribed:</span>
+          <select id="rct-antibiotic">
+            <option value="none">None</option>
+            <option value="Amoxicillin">Amoxicillin 500 mg TID ×7 days (21 capsules, no refills)</option>
+            <option value="Clindamycin">Clindamycin 300 mg TID ×7 days (21 capsules, no refills)</option>
+          </select>
+        </label>
+        <!-- Analgesic checkboxes for endodontic cases -->
+        <label>
+          <span>Pain medications:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="rct-analgesic-acet500" value="Acetaminophen 500 mg"> Acetaminophen 500 mg</label>
+            <label><input type="checkbox" id="rct-analgesic-acet325" value="Acetaminophen 325 mg"> Acetaminophen 325 mg</label>
+            <label><input type="checkbox" id="rct-analgesic-ibu800" value="Ibuprofen 800 mg"> Ibuprofen 800 mg</label>
+          </div>
+        </label>
+      </fieldset>
+
+      <!-- Section: Crown Preparation -->
+      <fieldset id="section-crownPrep" class="hidden appointment-section">
+        <legend>Crown Preparation Details</legend>
+        <label>
+          <span>Tooth number(s):</span>
+          <input type="text" id="prep-teeth" placeholder="e.g. 19">
+        </label>
+        <label>
+          <span>Anesthesia used:</span>
+          <select id="prep-anesthesia">
+            <option value="lidocaine" data-mg="34" data-epi="0.017">1.7 mL 2% Lidocaine (34 mg) with 1:100,000 epinephrine (0.017 mg)</option>
+            <option value="articaine" data-mg="68" data-epi="0.017">1.7 mL 4% Articaine (68 mg) with 1:100,000 epinephrine (0.017 mg)</option>
+            <option value="mepivacaine" data-mg="51" data-epi="0">1.7 mL 3% Mepivacaine (51 mg) without epinephrine</option>
+            <option value="prilocaine" data-mg="68" data-epi="0.0085">1.7 mL 4% Prilocaine (68 mg) with 1:200,000 epinephrine (0.0085 mg)</option>
+            <option value="none" data-mg="0" data-epi="0">None</option>
+          </select>
+        </label>
+        <label>
+          <span>Number of carpules:</span>
+          <input type="number" id="prep-carpules" min="0" step="0.5" value="1">
+        </label>
+        <label>
+          <span>Isolation method:</span>
+          <select id="prep-isolation">
+            <option value="rubber dam">Rubber dam</option>
+            <option value="isovac">Isovac</option>
+            <option value="cotton rolls">Cotton rolls</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <label>
+          <span>Prep type:</span>
+          <select id="prep-type">
+            <option value="full coverage">Full coverage</option>
+            <option value="onlay">Onlay</option>
+            <option value="inlay">Inlay</option>
+            <option value="veneer">Veneer</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Impression method:</span>
+          <select id="prep-impression">
+            <option value="digital">Digital scan</option>
+            <option value="conventional">Conventional PVS impression</option>
+            <option value="both">Both</option>
+          </select>
+        </label>
+        <label>
+          <span>Temporary crown material:</span>
+          <select id="prep-tempMaterial">
+            <option value="acrylic">Acrylic</option>
+            <option value="bisacryl">Bis‑acryl composite</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Shade selected:</span>
+          <select id="prep-shade">
+            <option value="A1">A1</option>
+            <option value="A2" selected>A2</option>
+            <option value="A3">A3</option>
+            <option value="B1">B1</option>
+            <option value="B2">B2</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Crown material:</span>
+          <select id="prep-material">
+            <option value="zirconia">Zirconia</option>
+            <option value="EMAX">EMAX</option>
+            <option value="PFM">Porcelain‑fused‑to‑metal</option>
+            <option value="gold">Gold</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Occlusion checked and adjusted:</span>
+          <select id="prep-occlusion">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Post‑operative instructions given:</span>
+          <select id="prep-postop">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="prep-notes"></textarea>
+        </label>
+
+        <!-- Prescription selections for crown preparation if needed -->
+        <label>
+          <span>Antibiotic prescribed:</span>
+          <select id="prep-antibiotic">
+            <option value="none">None</option>
+            <option value="Amoxicillin">Amoxicillin 500 mg TID ×7 days (21 capsules, no refills)</option>
+            <option value="Clindamycin">Clindamycin 300 mg TID ×7 days (21 capsules, no refills)</option>
+          </select>
+        </label>
+        <!-- Analgesic checkboxes for crown preparation -->
+        <label>
+          <span>Pain medications:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="prep-analgesic-acet500" value="Acetaminophen 500 mg"> Acetaminophen 500 mg</label>
+            <label><input type="checkbox" id="prep-analgesic-acet325" value="Acetaminophen 325 mg"> Acetaminophen 325 mg</label>
+            <label><input type="checkbox" id="prep-analgesic-ibu800" value="Ibuprofen 800 mg"> Ibuprofen 800 mg</label>
+          </div>
+        </label>
+      </fieldset>
+
+      <!-- Section: Dentures Delivery -->
+      <fieldset id="section-dentureDelivery" class="hidden appointment-section">
+        <legend>Dentures Delivery Details</legend>
+        <label>
+          <span>Denture type:</span>
+          <select id="dentdel-type">
+            <option value="complete upper">Complete upper</option>
+            <option value="complete lower">Complete lower</option>
+            <option value="complete upper and lower">Complete upper and lower</option>
+            <option value="partial upper">Partial upper</option>
+            <option value="partial lower">Partial lower</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Fit and retention:</span>
+          <select id="dentdel-fit">
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="poor">Poor</option>
+          </select>
+        </label>
+        <label>
+          <span>Occlusion:</span>
+          <select id="dentdel-occlusion">
+            <option value="balanced">Balanced occlusion</option>
+            <option value="needs adjustment">Needs adjustment</option>
+          </select>
+        </label>
+        <label>
+          <span>Pressure areas adjusted:</span>
+          <select id="dentdel-adjusted">
+            <option value="none">None</option>
+            <option value="yes">Yes</option>
+          </select>
+        </label>
+        <label>
+          <span>Post‑delivery instructions given:</span>
+          <select id="dentdel-postop">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="dentdel-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Denture Follow‑up -->
+      <fieldset id="section-dentureFollowUp" class="hidden appointment-section">
+        <legend>Denture Follow‑up Details</legend>
+        <label>
+          <span>Denture type:</span>
+          <select id="dentfu-type">
+            <option value="complete upper">Complete upper</option>
+            <option value="complete lower">Complete lower</option>
+            <option value="complete upper and lower">Complete upper and lower</option>
+            <option value="partial upper">Partial upper</option>
+            <option value="partial lower">Partial lower</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Patient reported issues:</span>
+          <textarea id="dentfu-issues" placeholder="Sore spots, loose fit, speech difficulties, etc."></textarea>
+        </label>
+        <label>
+          <span>Adjustments made today:</span>
+          <textarea id="dentfu-adjustments" placeholder="Describe adjustments performed"></textarea>
+        </label>
+        <label>
+          <span>Outcome:</span>
+          <select id="dentfu-outcome">
+            <option value="improved">Improved</option>
+            <option value="same">Same</option>
+            <option value="worse">Worse</option>
+          </select>
+        </label>
+        <label>
+          <span>Follow‑up needed:</span>
+          <select id="dentfu-followup">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="dentfu-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Denture Adjustment -->
+      <fieldset id="section-dentureAdjust" class="hidden appointment-section">
+        <legend>Denture Adjustment Details</legend>
+        <label>
+          <span>Denture type:</span>
+          <select id="dentadj-type">
+            <option value="complete upper">Complete upper</option>
+            <option value="complete lower">Complete lower</option>
+            <option value="complete upper and lower">Complete upper and lower</option>
+            <option value="partial upper">Partial upper</option>
+            <option value="partial lower">Partial lower</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          <span>Area adjusted:</span>
+          <textarea id="dentadj-area" placeholder="Describe sore spots or areas adjusted"></textarea>
+        </label>
+        <label>
+          <span>Outcome:</span>
+          <select id="dentadj-outcome">
+            <option value="improved">Improved</option>
+            <option value="same">Same</option>
+            <option value="worse">Worse</option>
+          </select>
+        </label>
+        <label>
+          <span>Follow‑up needed:</span>
+          <select id="dentadj-followup">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="dentadj-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Occlusal Guard Delivery -->
+      <fieldset id="section-occlusalGuard" class="hidden appointment-section">
+        <legend>Occlusal Guard Delivery</legend>
+        <label>
+          <span>Arch:</span>
+          <select id="guard-arch">
+            <option value="lower">Lower</option>
+            <option value="upper">Upper</option>
+            <option value="both">Upper and lower</option>
+          </select>
+        </label>
+        <label>
+          <span>Fit evaluation (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="guard-fit-passive" value="fit passive and stable without rocking"> Passive and stable without rocking</label>
+            <label><input type="checkbox" id="guard-fit-occlusion" value="occlusion even in centric and excursions"> Even occlusion contact in centric and excursions</label>
+            <label><input type="checkbox" id="guard-fit-smooth" value="no sharp edges; borders smooth and polished"> No sharp edges; borders smooth & polished</label>
+            <label><input type="checkbox" id="guard-fit-bite" value="patient's bite comfortable"> Bite comfortable</label>
+          </div>
+        </label>
+        <label>
+          <span>Patient instructions (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="guard-instr-insert" value="instructions on insertion, removal, and cleaning provided"> Insertion, removal & cleaning instructions</label>
+            <label><input type="checkbox" id="guard-instr-wear" value="advised to wear nightly or as directed"> Wear nightly or as directed</label>
+            <label><input type="checkbox" id="guard-instr-adapt" value="discussed adaptation period and possible mild discomfort or increased salivation"> Discussed adaptation period & mild discomfort</label>
+            <label><input type="checkbox" id="guard-instr-return" value="advised to return if persistent discomfort or fit issues arise"> Return if discomfort or fit issues</label>
+            <label><input type="checkbox" id="guard-instr-fee" value="informed about additional fee for upper guard"> Informed about fee for upper guard</label>
+          </div>
+        </label>
+        <label>
+          <span>Follow‑up schedule:</span>
+          <select id="guard-followup">
+            <option value="1-2 weeks">Re‑evaluation in 1–2 weeks</option>
+            <option value="other">Other</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <label>
+          <span>Specify follow‑up (if other):</span>
+          <input type="text" id="guard-followup-other" placeholder="e.g. in 3 weeks">
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="guard-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Limited / Emergency Exam -->
+      <fieldset id="section-limitedExam" class="hidden appointment-section">
+        <legend>Limited / Emergency Exam Details</legend>
+        <label>
+          <span>Reason for visit:</span>
+          <input type="text" id="lem-reason" placeholder="e.g. pain, trauma, swelling">
+        </label>
+        <label>
+          <span>Tooth number(s) involved:</span>
+          <input type="text" id="lem-teeth" placeholder="e.g. 4, 5">
+        </label>
+        <label>
+          <span>Symptoms &amp; findings:</span>
+          <textarea id="lem-findings" placeholder="Describe pain, swelling, mobility, etc."></textarea>
+        </label>
+        <label>
+          <span>Radiographic interpretation (check all that apply):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="lem-radio-decay" value="decay"> Decay</label>
+            <label><input type="checkbox" id="lem-radio-fracture" value="fracture"> Fracture</label>
+            <label><input type="checkbox" id="lem-radio-parl" value="periapical radiolucency"> PARL</label>
+            <label><input type="checkbox" id="lem-radio-boneLoss" value="bone loss"> Bone loss</label>
+            <label><input type="checkbox" id="lem-radio-other" value="other"> Other</label>
+          </div>
+        </label>
+        <label>
+          <span>Diagnosis:</span>
+          <input type="text" id="lem-diagnosis" placeholder="Provisional diagnosis">
+        </label>
+        <label>
+          <span>Treatment provided:</span>
+          <input type="text" id="lem-treatment" placeholder="Palliative treatment provided">
+        </label>
+        <label>
+          <span>Antibiotic prescribed:</span>
+          <select id="lem-antibiotic">
+            <option value="none">None</option>
+            <option value="Amoxicillin">Amoxicillin 500 mg TID ×7 days (21 capsules, no refills)</option>
+            <option value="Clindamycin">Clindamycin 300 mg TID ×7 days (21 capsules, no refills)</option>
+          </select>
+        </label>
+        <label>
+          <span>Pain medications:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="lem-analgesic-aceta500" value="Acetaminophen 500 mg"> Acetaminophen 500 mg</label>
+            <label><input type="checkbox" id="lem-analgesic-aceta325" value="Acetaminophen 325 mg"> Acetaminophen 325 mg</label>
+            <label><input type="checkbox" id="lem-analgesic-ibu800" value="Ibuprofen 800 mg"> Ibuprofen 800 mg</label>
+          </div>
+        </label>
+        <label>
+          <span>Follow‑up and recommendations:</span>
+          <textarea id="lem-followup" placeholder="e.g. Return for definitive treatment in one week"></textarea>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="lem-notes"></textarea>
+        </label>
+      </fieldset>
+
+      <!-- Section: Complete Exam -->
+      <fieldset id="section-completeExam" class="hidden appointment-section">
+        <legend>Complete Exam Details</legend>
+        <label>
+          <span>X‑rays taken today (select all):</span>
+          <div class="inline">
+            <label><input type="checkbox" id="cex-xray-fmx" value="FMX"> Full‑mouth series (FMX)</label>
+            <label><input type="checkbox" id="cex-xray-bw" value="Bitewing"> Bitewings</label>
+            <label><input type="checkbox" id="cex-xray-pa" value="Periapical"> Periapicals</label>
+            <label><input type="checkbox" id="cex-xray-pan" value="Panoramic"> Panoramic</label>
+            <label><input type="checkbox" id="cex-xray-ct" value="CBCT"> CBCT</label>
+          </div>
+        </label>
+        <label>
+          <span>X‑rays reviewed with patient and doctor:</span>
+          <select id="cex-xray-reviewed">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>X‑ray findings included:</span>
+          <textarea id="cex-xray-findings" placeholder="Describe notable radiographic findings"></textarea>
+        </label>
+        <label>
+          <span>Visual oral cancer screening:</span>
+          <div class="inline">
+            <label><input type="checkbox" id="cex-ocs-none" value="no abnormal findings"> No significant findings</label>
+            <input type="text" id="cex-ocs-notes" placeholder="Describe any lesions/findings">
+          </div>
+        </label>
+        <label>
+          <span>Head &amp; neck exam:</span>
+          <textarea id="cex-hn" placeholder="E.g. No significant head and neck trauma or gross tissue changes noted"></textarea>
+        </label>
+        <label>
+          <span>Occlusion classification:</span>
+          <select id="cex-occlusion">
+            <option value="Class I">Class I</option>
+            <option value="Class II">Class II</option>
+            <option value="Class III">Class III</option>
+          </select>
+        </label>
+        <label>
+          <span>CAMBRA caries risk:</span>
+          <select id="cex-cambra-risk">
+            <option value="low">Low</option>
+            <option value="moderate">Moderate</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <label>
+          <span>CAMBRA risk factors (list):</span>
+          <textarea id="cex-cambra-factors"></textarea>
+        </label>
+        <label>
+          <span>Periodontal classification:</span>
+          <select id="cex-perio-class">
+            <option value="healthy">Healthy</option>
+            <option value="gingivitis">Gingivitis</option>
+            <option value="mild periodontitis">Mild periodontitis</option>
+            <option value="moderate periodontitis">Moderate periodontitis</option>
+            <option value="severe periodontitis">Severe periodontitis</option>
+          </select>
+        </label>
+        <label>
+          <span>Current oral hygiene (OHI):</span>
+          <select id="cex-ohi">
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="poor">Poor</option>
+          </select>
+        </label>
+        <label>
+          <span>Calculus/tartar present:</span>
+          <select id="cex-calculus">
+            <option value="none">None</option>
+            <option value="light">Light</option>
+            <option value="moderate">Moderate</option>
+            <option value="heavy">Heavy</option>
+          </select>
+        </label>
+        <label>
+          <span>Oral/facial photographs taken:</span>
+          <select id="cex-photos">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </label>
+        <label>
+          <span>Periodontal screening completed today:</span>
+          <select id="cex-perio-screen">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Decay diagnosed using Diagnodent – teeth with positive readings:</span>
+          <input type="text" id="cex-diagnodent" placeholder="e.g. 3, 14">
+        </label>
+        <label>
+          <span>Treatment needs with diagnosis:</span>
+          <textarea id="cex-treatment-needs"></textarea>
+        </label>
+        <label>
+          <span>Alternative treatment options (if any):</span>
+          <textarea id="cex-alternative-options"></textarea>
+        </label>
+        <label>
+          <span>Recommended STM treatment:</span>
+          <textarea id="cex-recommended-stm"></textarea>
+        </label>
+        <label>
+          <span>Treatment plan summary:</span>
+          <textarea id="cex-plan" placeholder="Outline major treatments planned"></textarea>
+        </label>
+        <label>
+          <span>Hygiene instructions given:</span>
+          <select id="cex-hygiene">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <label>
+          <span>Additional notes:</span>
+          <textarea id="cex-notes"></textarea>
+        </label>
+      </fieldset>
+      <!-- End of dynamic sections -->
+      <!-- General documentation applicable to all appointment types -->
+      <fieldset id="general-documentation">
+        <legend>Additional Documentation</legend>
+        <label>
+          <span>Informed consent details:</span>
+          <textarea id="consentDetails" placeholder="Document risks, benefits, alternatives discussed; note anesthesia risks explained and radiograph consent if applicable."></textarea>
+        </label>
+        <label>
+          <span>Pre‑operative findings:</span>
+          <textarea id="preOpDetails" placeholder="Describe existing restorations, fracture lines, marginal integrity, etc."></textarea>
+        </label>
+        <label>
+          <span>Post‑operative evaluation &amp; behavior:</span>
+          <textarea id="postOpDetails" placeholder="Describe tissue condition, patient tolerance, complications and behaviour during the procedure."></textarea>
+        </label>
+        <label>
+          <span>Radiographic details:</span>
+          <textarea id="radioDetails" placeholder="Specify which teeth/areas were imaged and note bone levels, periapical status and other findings."></textarea>
+        </label>
+        <label>
+          <span>Follow‑up plan:</span>
+          <textarea id="followUpPlan" placeholder="Provide recall interval or return date for next visit (e.g. Return in two weeks for crown prep #29)"></textarea>
+        </label>
+      </fieldset>
+    </form>
+    <button type="button" class="generate" id="generateButton">Generate Note</button>
+    <textarea id="outputNote" readonly placeholder="Your generated note will appear here..."></textarea>
+  </main>
+
+  <script>
+    // Utility: gather checked values for groups of checkboxes
+    function getCheckedValues(prefix) {
+      const inputs = document.querySelectorAll('input[id^="' + prefix + '"]');
+      const selected = [];
+      inputs.forEach(input => {
+        if (input.type === 'checkbox' && input.checked) {
+          selected.push(input.value);
+        }
+      });
+      return selected;
+    }
+
+    /**
+     * Build a descriptive sentence for local anesthetic administration.
+     * Looks up the selected option's mg and epinephrine content per carpule
+     * via data attributes and multiplies by the number of carpules.
+     *
+     * @param {string} selectId - The id of the anesthesia <select> element.
+     * @param {string|number} carpules - Number of carpules administered (may be string).
+     * @returns {string} Narrative sentence describing anesthetic use, or empty string if none.
+     */
+    function buildAnesthesiaSentence(selectId, carpules) {
+      const select = document.getElementById(selectId);
+      if (!select) return '';
+      const idx = select.selectedIndex;
+      const opt = select.options[idx];
+      const numCarpules = parseFloat(carpules) || 0;
+      // If no carpules or 'none' selected, return empty string
+      if (!opt || opt.value === 'none' || numCarpules === 0) {
+        return '';
+      }
+      const mgPer = parseFloat(opt.dataset.mg) || 0;
+      const epiPer = parseFloat(opt.dataset.epi) || 0;
+      const totalMg = mgPer * numCarpules;
+      const totalEpi = epiPer * numCarpules;
+      // Use the option's text for base description (includes volume, concentration, mg and epi per carpule)
+      let description = opt.textContent.trim();
+      let sentence = `Administered ${numCarpules} carpule${numCarpules > 1 ? 's' : ''} of ${description}`;
+      // If more than one carpule, append total mg and epi amounts
+      if (numCarpules > 1) {
+        sentence += ` (total anesthetic ${totalMg.toFixed(0)} mg`;
+        if (epiPer > 0) {
+          sentence += `, total epinephrine ${totalEpi.toFixed(3)} mg`;
+        }
+        sentence += `)`;
+      }
+      sentence += '.';
+      return sentence;
+    }
+
+    // Show/hide dynamic sections based on appointment type
+    const appointmentSelect = document.getElementById('appointmentType');
+    const sections = {
+      filling: document.getElementById('section-filling'),
+      extraction: document.getElementById('section-extraction'),
+      crownCement: document.getElementById('section-crownCement'),
+      invisalignStart: document.getElementById('section-invisalignStart'),
+      invisalignRecheck: document.getElementById('section-invisalignRecheck'),
+      invisalignAttachment: document.getElementById('section-invisalignAttachment'),
+      prp: document.getElementById('section-prp'),
+      consultation: document.getElementById('section-consultation'),
+      implant: document.getElementById('section-implant')
+      ,rootCanal: document.getElementById('section-rootCanal')
+      ,crownPrep: document.getElementById('section-crownPrep')
+      ,dentureDelivery: document.getElementById('section-dentureDelivery')
+      ,dentureFollowUp: document.getElementById('section-dentureFollowUp')
+      ,dentureAdjust: document.getElementById('section-dentureAdjust')
+      ,completeExam: document.getElementById('section-completeExam')
+      ,limitedExam: document.getElementById('section-limitedExam')
+      ,occlusalGuard: document.getElementById('section-occlusalGuard')
+      ,invisalignRecords: document.getElementById('section-invisalignRecords')
+    };
+
+    appointmentSelect.addEventListener('change', function() {
+      // hide all sections
+      for (const key in sections) {
+        sections[key].classList.add('hidden');
+      }
+      const selected = this.value;
+      if (selected && sections[selected]) {
+        sections[selected].classList.remove('hidden');
+      }
+    });
+
+    // Dynamic multi‑tooth handling for restorative appointments
+    (function() {
+      const addBtn = document.getElementById('fill-add-tooth');
+      const entryIds = ['fill-tooth-entry-1', 'fill-tooth-entry-2', 'fill-tooth-entry-3'];
+      if (addBtn) {
+        addBtn.addEventListener('click', function() {
+          for (const id of entryIds) {
+            const el = document.getElementById(id);
+            if (el && el.classList.contains('hidden')) {
+              el.classList.remove('hidden');
+              // When the last entry is revealed, hide the add button and show free‑text area
+              if (id === 'fill-tooth-entry-3') {
+                addBtn.classList.add('hidden');
+                const freeContainer = document.getElementById('fill-more-teeth-container');
+                if (freeContainer) freeContainer.classList.remove('hidden');
+              }
+              break;
+            }
+          }
+        });
+      }
+    })();
+
+    // Generate the narrative note
+    document.getElementById('generateButton').addEventListener('click', function() {
+      const name = document.getElementById('patientName').value.trim() || 'Patient';
+      const date = document.getElementById('appointmentDate').value || new Date().toISOString().split('T')[0];
+      const responsible = document.getElementById('responsibleParty').value.trim();
+      const healthHistory = document.getElementById('healthHistory').value.trim();
+      const bp = document.getElementById('vital-bp').value.trim();
+      const pulse = document.getElementById('vital-pulse').value.trim();
+      const chief = document.getElementById('chiefComplaint').value.trim();
+      const type = appointmentSelect.value;
+
+      // Provider and additional global details
+      const providerName = document.getElementById('providerName').value.trim();
+      const consentDetails = document.getElementById('consentDetails').value.trim();
+      const preOpDetails = document.getElementById('preOpDetails').value.trim();
+      const postOpDetails = document.getElementById('postOpDetails').value.trim();
+      const radioDetails = document.getElementById('radioDetails').value.trim();
+      const followUpPlan = document.getElementById('followUpPlan').value.trim();
+      // Build a general information paragraph including patient name and provider
+      let generalParagraph = `${date}: Patient: ${name}.`;
+      if (providerName) {
+        generalParagraph += ` Provider: ${providerName}.`;
+      }
+      if (responsible) {
+        generalParagraph += ` Responsible party: ${responsible}.`;
+      }
+      if (healthHistory) {
+        generalParagraph += ` Health history: ${healthHistory}.`;
+      }
+      if (chief) {
+        generalParagraph += ` Chief complaint: \"${chief}\".`;
+      }
+      if (bp) {
+        generalParagraph += ` BP: ${bp} mmHg.`;
+      }
+      if (pulse) {
+        generalParagraph += ` Pulse: ${pulse} bpm.`;
+      }
+      let note = generalParagraph.trim();
+      switch (type) {
+        case 'filling': {
+          // Gather multi‑tooth restorative details
+          const carpules = document.getElementById('fill-carpules').value;
+          // Injection technique mapping
+          const injectionChoice = document.getElementById('fill-injection').value;
+          const injectionMap = {
+            infiltration: 'infiltration',
+            block: 'nerve block',
+            both: 'infiltration and nerve block',
+            none: ''
+          };
+          const injection = injectionMap[injectionChoice] || '';
+          const topical = document.getElementById('fill-topical').value;
+          const topicalType = document.getElementById('fill-topical-type').value;
+          // Isolation methods
+          const isolation = [];
+          if (document.getElementById('fill-isolation-cotton').checked) isolation.push('cotton roll');
+          if (document.getElementById('fill-isolation-isovac').checked) isolation.push('Isovac');
+          if (document.getElementById('fill-isolation-rubberdam').checked) isolation.push('rubber dam');
+          const bonding = document.getElementById('fill-bonding').value;
+          const xrays = getCheckedValues('fill-xray-');
+          const radioConditions = getCheckedValues('fill-radio-');
+          const diagnosis = document.getElementById('fill-diagnosis').value;
+          const pulp = document.getElementById('fill-pulp').value;
+          const symptoms = document.getElementById('fill-symptoms').value.trim();
+          const notes = document.getElementById('fill-notes').value.trim();
+          // Collect pre‑operative findings and caries depth
+          const preopFindings = [];
+          if (document.getElementById('fill-preop-caries') && document.getElementById('fill-preop-caries').checked) preopFindings.push('visible caries');
+          if (document.getElementById('fill-preop-restoration') && document.getElementById('fill-preop-restoration').checked) preopFindings.push('existing restoration present');
+          if (document.getElementById('fill-preop-no-path') && document.getElementById('fill-preop-no-path').checked) preopFindings.push('no fracture or soft tissue pathology');
+          const cariesDepth = document.getElementById('fill-preop-depth') ? document.getElementById('fill-preop-depth').value : '';
+          // Collect composite material selections
+          const compositeList = [];
+          if (document.getElementById('fill-comp-A1') && document.getElementById('fill-comp-A1').checked) compositeList.push('TPH Spectra A1');
+          if (document.getElementById('fill-comp-A2') && document.getElementById('fill-comp-A2').checked) compositeList.push('TPH Spectra A2');
+          if (document.getElementById('fill-comp-Beautifil') && document.getElementById('fill-comp-Beautifil').checked) compositeList.push('Beautifil Flow A2');
+          if (document.getElementById('fill-comp-other') && document.getElementById('fill-comp-other').checked) {
+            const otherCompVal = document.getElementById('fill-comp-other-text') ? document.getElementById('fill-comp-other-text').value.trim() : '';
+            if (otherCompVal) compositeList.push(otherCompVal);
+          }
+          const flossed = document.getElementById('fill-flossed').value;
+          const occlusion = document.getElementById('fill-occlusion').value;
+          // Collect individual tooth entries
+          const toothEntries = [];
+          for (let i = 1; i <= 3; i++) {
+            const tNum = document.getElementById(`fill-tooth${i}`).value.trim();
+            if (tNum) {
+              const surfs = [];
+              ['O','M','D','B','L'].forEach(letter => {
+                const cb = document.getElementById(`fill-surface${i}-${letter}`);
+                if (cb && cb.checked) surfs.push(cb.value);
+              });
+              let entry = `tooth ${tNum}`;
+              if (surfs.length) entry += ` (${surfs.join(', ')})`;
+              toothEntries.push(entry);
+            }
+          }
+          const moreTeethVal = document.getElementById('fill-more-teeth') ? document.getElementById('fill-more-teeth').value.trim() : '';
+          if (moreTeethVal) {
+            toothEntries.push(moreTeethVal);
+          }
+          // Build paragraphs for the note (excluding general info which is handled separately)
+          const paragraphs = [];
+          // Determine if radiographs were taken
+          const xraysTaken = xrays.length > 0;
+          // First content paragraph: radiographs, diagnosis and pre‑operative findings
+          let p2 = `Radiographs taken: ${xraysTaken ? xrays.join(', ') : 'none'}.`;
+          if (radioConditions.length) p2 += ` Radiographic interpretation: ${radioConditions.join(', ')}.`;
+          // Append additional radiographic details from global input
+          if (radioDetails) {
+            p2 += ` Radiographic details: ${radioDetails}.`;
+          }
+          p2 += ` Diagnosis: ${diagnosis}.`;
+          // Combine pre‑operative findings from checkboxes and global preOpDetails
+          const preOpPieces = [];
+          if (preopFindings && preopFindings.length) preOpPieces.push(preopFindings.join(', '));
+          if (cariesDepth) preOpPieces.push(`caries depth ${cariesDepth.toLowerCase()}`);
+          if (preOpDetails) preOpPieces.push(preOpDetails);
+          if (preOpPieces.length) {
+            p2 += ` Pre‑operative findings: ${preOpPieces.join('; ')}.`;
+          }
+          paragraphs.push(p2.trim());
+          // Consent paragraph
+          let consentParagraph = '';
+          if (consentDetails) {
+            consentParagraph = `Informed consent: ${consentDetails}.`;
+          } else {
+            consentParagraph = `Discussed risks, benefits and alternatives of dental restorative treatment. Patient verbalized understanding and consented to proceed.`;
+            // Include anesthesia risks if anesthetic used
+            const anesthesiaSentenceFillTemp = buildAnesthesiaSentence('fill-anesthesia', carpules);
+            if (anesthesiaSentenceFillTemp) {
+              consentParagraph += ` Potential risks of local anesthesia (allergic reaction, paresthesia, etc.) were explained and accepted.`;
+            }
+            if (xraysTaken) {
+              consentParagraph += ` Patient consented to radiographs.`;
+            }
+          }
+          paragraphs.push(consentParagraph.trim());
+          // Third paragraph: anesthesia, injection and topical
+          let p3 = '';
+          const anesthesiaSentenceFill = buildAnesthesiaSentence('fill-anesthesia', carpules);
+          if (anesthesiaSentenceFill) p3 += `${anesthesiaSentenceFill} `;
+          if (injection) p3 += `Using ${injection} technique. `;
+          if (topical === 'yes' || (topicalType && topicalType !== 'none')) {
+            let tDesc = 'Topical anesthetic';
+            if (topicalType && topicalType !== 'none') tDesc += ` (${topicalType})`;
+            tDesc += ' applied.';
+            p3 += `${tDesc} `;
+          }
+          if (p3.trim()) paragraphs.push(p3.trim());
+          // Fourth paragraph: procedure and materials
+          let p4 = '';
+          if (toothEntries.length) {
+            p4 += `Procedure: Dental restorative `;
+            p4 += toothEntries.length > 1 ? 'procedures' : 'procedure';
+            p4 += ` performed on ${toothEntries.join('; ')}. `;
+          } else {
+            p4 += `Procedure: Dental restorative procedure performed on N/A. `;
+          }
+          p4 += `Isolation: ${isolation.length ? isolation.join(', ') : 'none'}. Bonding agent: ${bonding}.`;
+          // Include composite material selections
+          if (compositeList && compositeList.length) {
+            p4 += ` Composite material used: ${compositeList.join(', ')}. Shade selected prior to isolation.`;
+          }
+          p4 += ` Proximity to pulp: ${pulp}.`;
+          if (symptoms) p4 += ` Symptoms/findings: ${symptoms}.`;
+          p4 += ` Contacts flossed and checked: ${flossed}.`;
+          p4 += ` Occlusion adjusted: ${occlusion}.`;
+          // Standard restorative protocol steps per ADA compliant template
+          p4 += ` Caries removal on ${toothEntries.length ? toothEntries.join('; ') : 'the designated tooth'} with a round bur on slow speed, verified with explorer/visual inspection. `;
+          p4 += `Cavity preparation refined to sound tooth structure. `;
+          p4 += `Etched enamel with 33% phosphoric acid for 15 seconds, rinsed 15 seconds and air‑dried for 3 seconds. `;
+          p4 += `Applied OptiBond FL Primer for 15 seconds with gentle brushing and air‑dried for 5 seconds. `;
+          p4 += `Applied OptiBond FL Adhesive and light cured for 20 seconds. `;
+          p4 += `Placed composite incrementally with each increment light cured. `;
+          p4 += `Finished and polished restoration; margins smooth. `;
+          p4 += `Checked proximal contacts with floss. `;
+          p4 += `Adjusted occlusion; confirmed patient comfort.`;
+          paragraphs.push(p4.trim());
+          // Post‑operative evaluation and behaviour
+          if (postOpDetails) {
+            paragraphs.push(`Post‑operative evaluation & behavior: ${postOpDetails}.`);
+          }
+          // Additional notes and instructions with standard post‑op narrative
+          let p5 = `Post‑op: Patient tolerated procedure well. No immediate postoperative sensitivity noted. Provided verbal and written post‑op instructions (avoid chewing until anesthesia wears off, possible mild sensitivity). Patient left in good condition.`;
+          if (notes) p5 += ` Additional notes: ${notes}.`;
+          if (followUpPlan) {
+            p5 += ` Follow‑up plan: ${followUpPlan}.`;
+          }
+          paragraphs.push(p5.trim());
+          // Append paragraphs to note after a blank line
+          if (paragraphs.length) {
+            note += '\n\n' + paragraphs.join('\n\n');
+          }
+          break;
+        }
+        case 'extraction': {
+          const extType = document.getElementById('ext-type').value;
+          const teeth = document.getElementById('ext-teeth').value.trim();
+          const anesthesia = document.getElementById('ext-anesthesia').value;
+          const carpules = document.getElementById('ext-carpules').value;
+          const sedation = document.getElementById('ext-sedation').value;
+          const topical = document.getElementById('ext-topical').value;
+          const topicalType = document.getElementById('ext-topical-type').value;
+          // Translate injection choice to descriptive phrase
+          const injectionChoiceExt = document.getElementById('ext-injection').value;
+          const injectionMapExt = {
+            infiltration: 'infiltration',
+            block: 'nerve block',
+            both: 'infiltration and nerve block'
+          };
+          const injection = injectionMapExt[injectionChoiceExt] || '';
+          const options = getCheckedValues('ext-option-');
+          const choice = document.getElementById('ext-choice').value;
+          const clearance = document.getElementById('ext-clearance').value;
+          const consent = document.getElementById('ext-consent').value;
+          const treatmentplan = document.getElementById('ext-treatmentplan').value.trim();
+          const prescription = document.getElementById('ext-prescription').value.trim();
+          const followup = document.getElementById('ext-followup').value.trim();
+          const instruments = getCheckedValues('ext-instrument-');
+          // Radiographic interpretation conditions for extraction
+          const radioConditionsExt = getCheckedValues('ext-radio-');
+          // Prescriptions fields
+          const antibiotic = document.getElementById('ext-antibiotic').value;
+          // Gather multiple analgesics selected via checkboxes
+          const analgesicList = getCheckedValues('ext-analgesic-');
+          const sectioning = document.getElementById('ext-sectioning').value;
+          const complications = getCheckedValues('ext-complications-');
+          const sutures = document.getElementById('ext-sutures').value;
+          const postop = document.getElementById('ext-postop').value;
+          const notes = document.getElementById('ext-notes').value.trim();
+          const assessment = document.getElementById('ext-assessment').value.trim();
+          const pulpDiag = document.getElementById('ext-pulp-diagnosis').value;
+          const apicalDiag = document.getElementById('ext-apical-diagnosis').value;
+          // Build assessment description from checkboxes and free text
+          const assessmentChecks = getCheckedValues('ext-assess-');
+          // Prepare prescriptions list
+          const prescriptionStrings = [];
+          if (antibiotic && antibiotic !== 'none') {
+            if (antibiotic === 'Amoxicillin') {
+              prescriptionStrings.push('Amoxicillin 500 mg – take one capsule three times daily for 7 days (21 capsules, no refills)');
+            } else if (antibiotic === 'Clindamycin') {
+              prescriptionStrings.push('Clindamycin 300 mg – take one capsule three times daily for 7 days (21 capsules, no refills)');
+            } else {
+              prescriptionStrings.push(antibiotic);
+            }
+          }
+          if (analgesicList.length) {
+            analgesicList.forEach(a => prescriptionStrings.push(a));
+          }
+          // Start assembling paragraphs
+          const paragraphsExt = [];
+          // Paragraph 1 (general information) is handled globally; do not include here
+          // Paragraph 2: radiographic interpretation, assessment, diagnoses and pre‑op details
+          let pe2 = '';
+          if (radioConditionsExt.length) pe2 += `Radiographic interpretation: ${radioConditionsExt.join(', ')}.`;
+          // Append radiographic details from global section
+          if (radioDetails) pe2 += ` Radiographic details: ${radioDetails}.`;
+          // Append assessment checkboxes and free text
+          const assessPieces = [];
+          if (assessmentChecks.length) assessPieces.push(assessmentChecks.join(', '));
+          if (assessment) assessPieces.push(assessment);
+          if (assessPieces.length) pe2 += ` Assessment: ${assessPieces.join('; ')}.`;
+          if (pulpDiag) pe2 += ` Pulpal diagnosis: ${pulpDiag}.`;
+          if (apicalDiag) pe2 += ` Apical diagnosis: ${apicalDiag}.`;
+          // Append pre‑operative details from global section
+          if (preOpDetails) pe2 += ` Pre‑operative findings: ${preOpDetails}.`;
+          if (pe2.trim()) paragraphsExt.push(pe2.trim());
+          // Paragraph 3: options offered, patient decisions, consent and plan
+          let pe3 = '';
+          if (options.length) pe3 += `Options offered: ${options.join(', ')}.`;
+          if (choice) pe3 += ` Patient chose: ${choice}.`;
+          pe3 += ` Clearance letter required: ${clearance}. Consent obtained: ${consent}.`;
+          if (treatmentplan) pe3 += ` Treatment plan: ${treatmentplan}.`;
+          // Combine follow‑up from form and global follow‑up plan
+          const combinedFollowExt = [];
+          if (followup) combinedFollowExt.push(followup);
+          if (followUpPlan) combinedFollowExt.push(followUpPlan);
+          if (combinedFollowExt.length) pe3 += ` Next visit/follow‑up: ${combinedFollowExt.join('; ')}.`;
+          if (pe3.trim()) paragraphsExt.push(pe3.trim());
+          // Consent paragraph inserted here
+          let consentParagraphExt = '';
+          // Determine if any x‑rays were taken based on radiographic interpretation selections
+          const xraysTakenExt = radioConditionsExt.length > 0;
+          if (consentDetails) {
+            consentParagraphExt = `Informed consent: ${consentDetails}.`;
+          } else {
+            consentParagraphExt = `Discussed risks, benefits and alternatives of extraction. Patient verbalized understanding and consented to proceed.`;
+            // If anesthesia used, include potential anesthesia risks
+            const anesthesiaSentenceTmpExt = buildAnesthesiaSentence('ext-anesthesia', carpules);
+            if (anesthesiaSentenceTmpExt) {
+              consentParagraphExt += ` Potential risks of local anesthesia (allergic reaction, paresthesia, etc.) were explained and accepted.`;
+            }
+            if (xraysTakenExt) {
+              consentParagraphExt += ` Patient consented to radiographs.`;
+            }
+          }
+          paragraphsExt.push(consentParagraphExt.trim());
+          // Paragraph 4: anesthesia, sedation, injection, procedure details
+          let pe4 = '';
+          // Sedation mapping
+          if (sedation && sedation !== 'none') {
+            let sedationText = sedation;
+            if (sedation === 'nitrous') sedationText = 'nitrous oxide/oxygen';
+            pe4 += `Sedation used: ${sedationText}. `;
+          }
+          // Anesthetic sentence
+          const anesthesiaSentenceExt = buildAnesthesiaSentence('ext-anesthesia', carpules);
+          if (anesthesiaSentenceExt) pe4 += `${anesthesiaSentenceExt} `;
+          // Injection and topical details
+          if (injection) {
+            pe4 += `Using ${injection} technique`;
+            if (topical === 'yes' || (topicalType && topicalType !== 'none')) {
+              pe4 += ` with topical anesthetic`;
+              if (topicalType && topicalType !== 'none') pe4 += ` (${topicalType})`;
+            }
+            pe4 += `. `;
+          } else {
+            if (topical === 'yes' || (topicalType && topicalType !== 'none')) {
+              pe4 += `Topical anesthetic`;
+              if (topicalType && topicalType !== 'none') pe4 += ` (${topicalType})`;
+              pe4 += ` applied. `;
+            }
+          }
+          // Procedure details
+          pe4 += `${extType.charAt(0).toUpperCase() + extType.slice(1)} extraction performed on tooth/teeth ${teeth ? teeth : 'N/A'}. `;
+          pe4 += `Instruments used: ${instruments.length ? instruments.join(', ') : 'basic extraction instruments'}. `;
+          if (extType === 'surgical') pe4 += `The procedure involved using a surgical handpiece with removal of buccal and interproximal bone. `;
+          pe4 += `Sectioning required: ${sectioning}. `;
+          pe4 += `Complications: ${complications.length ? complications.join(', ') : 'none'}. `;
+          if (!complications.length || (complications.length === 1 && complications.includes('none'))) {
+            pe4 += `The patient tolerated the procedure well. `;
+          }
+          pe4 += `Sutures: ${sutures}. Tooth extracted with no complications. Pt tolerated the procedure well, all root tips accounted for.`;
+          paragraphsExt.push(pe4.trim());
+          // Post‑operative evaluation and behaviour from global section
+          if (postOpDetails) {
+            paragraphsExt.push(`Post‑operative evaluation & behavior: ${postOpDetails}.`);
+          }
+          // Paragraph 5: prescriptions and post‑op instructions
+          let pe5 = '';
+          if (prescriptionStrings.length) pe5 += `Prescriptions provided: ${prescriptionStrings.join('; ')}. `;
+          if (prescription) pe5 += `Prescription(s): ${prescription}. `;
+          pe5 += `Post‑operative instructions: ${postop}.`;
+          if (pe5.trim()) paragraphsExt.push(pe5.trim());
+          // Paragraph 6: additional notes
+          if (notes) paragraphsExt.push(`Additional notes: ${notes}.`);
+          // Combine paragraphs (add a blank line after the general info)
+          if (paragraphsExt.length) {
+            note += '\n\n' + paragraphsExt.join('\n\n');
+          }
+          break;
+        }
+        case 'crownCement': {
+          const tooth = document.getElementById('cement-tooth').value.trim();
+          const crownType = document.getElementById('cement-crownType').value;
+          const fit = document.getElementById('cement-fit').value;
+          const occlusion = document.getElementById('cement-occlusion').value;
+          const cement = document.getElementById('cement-type').value;
+          const xray = document.getElementById('cement-xray').value;
+          const notes = document.getElementById('cement-notes').value.trim();
+          note += `Crown cementation performed for tooth ${tooth}. Crown type: ${crownType}. `;
+          note += `Fit check: ${fit}. Occlusion adjusted: ${occlusion}. Cement used: ${cement}. Radiograph taken post‑cementation: ${xray}. `;
+          note += `Curing light was used to ensure proper set, and all excess cement was removed.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+        case 'invisalignStart': {
+          const attachments = document.getElementById('invstart-attachments').value;
+          const ipr = document.getElementById('invstart-ipr').value;
+          const aligners = document.getElementById('invstart-aligners').value;
+          const followup = document.getElementById('invstart-followup').value;
+          const notes = document.getElementById('invstart-notes').value.trim();
+          note += `Invisalign treatment initiated. Attachments placed: ${attachments}. `;
+          note += `IPR performed: ${ipr}. Number of aligners dispensed: ${aligners}. Next follow‑up in ${followup} weeks. `;
+          if (notes) note += `Additional notes: ${notes}.`;
+          break;
+        }
+        case 'invisalignRecheck': {
+          const tray = document.getElementById('invrecheck-tray').value;
+          const compliance = document.getElementById('invrecheck-compliance').value;
+          const attachments = document.getElementById('invrecheck-attachments').value;
+          const ipr = document.getElementById('invrecheck-ipr').value;
+          const notes = document.getElementById('invrecheck-notes').value.trim();
+          note += `Invisalign recheck. Patient on tray #${tray}. Compliance: ${compliance}. Attachments status: ${attachments}. IPR performed: ${ipr}.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+        case 'invisalignAttachment': {
+          const count = document.getElementById('invatt-count').value;
+          const composite = document.getElementById('invatt-composite').value;
+          const nextAligner = document.getElementById('invatt-nextAligner').value;
+          const notes = document.getElementById('invatt-notes').value.trim();
+          note += `Invisalign attachments bonded. Number placed: ${count}. Composite used: ${composite}. Next aligner delivered: ${nextAligner}.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+
+        case 'invisalignRecords': {
+          // Invisalign records appointment note
+          const records = [];
+          if (document.getElementById('invrec-records-pan').checked) records.push('panoramic radiograph');
+          if (document.getElementById('invrec-records-photo').checked) records.push('photographs');
+          if (document.getElementById('invrec-records-itero').checked) records.push('iTero scan');
+          if (document.getElementById('invrec-records-impressions').checked) records.push('impressions');
+          const followupRec = document.getElementById('invrec-followup').value;
+          const notesRec = document.getElementById('invrec-notes').value.trim();
+          note += `Invisalign records appointment. `;
+          if (records.length) {
+            note += `Records taken: ${records.join(', ')}. `;
+          } else {
+            note += `Records taken: panoramic radiograph, photographs, iTero scan, impressions. `;
+          }
+          note += `The patient was informed to wear the aligners 22 hours per day for 7 days, then to change to the next set as instructed. `;
+          note += `Instructions on proper aligner insertion and removal, oral hygiene maintenance, cleaning of aligners, and storage were provided. `;
+          if (followupRec) {
+            note += `Next follow‑up in ${followupRec} weeks. `;
+          }
+          if (notesRec) {
+            note += `Additional notes: ${notesRec}.`;
+          }
+          break;
+        }
+        case 'prp': {
+          const reason = document.getElementById('prp-reason').value;
+          const venipuncture = document.getElementById('prp-venipuncture').value;
+          const volume = document.getElementById('prp-volume').value;
+          const tolerance = document.getElementById('prp-tolerance').value;
+          const notes = document.getElementById('prp-notes').value.trim();
+          note += `Platelet‑rich plasma procedure performed for ${reason}. Venipuncture ${venipuncture === 'yes' ? 'successful' : 'unsuccessful'} on first attempt. `;
+          note += `Volume drawn: ${volume} ml. Patient tolerance: ${tolerance}.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+        case 'consultation': {
+          const chief = document.getElementById('consult-chief').value.trim();
+          const history = document.getElementById('consult-history').value.trim();
+          const findings = document.getElementById('consult-findings').value.trim();
+          const xrays = getCheckedValues('consult-xray-');
+          const diag = document.getElementById('consult-diagnosis').value.trim();
+          const options = document.getElementById('consult-options').value.trim();
+          const consent = document.getElementById('consult-consent').value;
+          const notes = document.getElementById('consult-notes').value.trim();
+          note += `Dental consultation visit. Chief complaint: ${chief}. `;
+          if (history) note += `History of present illness: ${history}. `;
+          if (findings) note += `Clinical findings: ${findings}. `;
+          note += `Radiographs: ${xrays.length ? xrays.join(', ') : 'none'}. `;
+          if (diag) note += `Diagnosis: ${diag}. `;
+          if (options) note += `Treatment options discussed: ${options}. `;
+          note += `Informed consent obtained: ${consent}.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+        case 'implant': {
+          const sites = document.getElementById('implant-sites').value.trim();
+          const system = document.getElementById('implant-system').value;
+          const guide = document.getElementById('implant-guide').value;
+          const graft = document.getElementById('implant-graft').value;
+          const membrane = document.getElementById('implant-membrane').value;
+          const torque = document.getElementById('implant-torque').value;
+          const healing = document.getElementById('implant-healing').value;
+          const sutures = document.getElementById('implant-sutures').value;
+          const postop = document.getElementById('implant-postop').value;
+          const notes = document.getElementById('implant-notes').value.trim();
+          note += `Implant placement performed at site(s) ${sites ? sites : 'N/A'}. Implant system: ${system}. `;
+          note += `Surgical guide used: ${guide}. Bone graft: ${graft}. Membrane: ${membrane}. Torque: ${torque} Ncm. `;
+          note += `Healing abutment placed: ${healing}. Sutures: ${sutures}. Post‑operative instructions: ${postop}.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+        case 'rootCanal': {
+          const teeth = document.getElementById('rct-teeth').value.trim();
+          const carpules = document.getElementById('rct-carpules').value;
+          const isolation = document.getElementById('rct-isolation').value;
+          const working = document.getElementById('rct-working').value;
+          const irrigant = document.getElementById('rct-irrigant').value;
+          const obturation = document.getElementById('rct-obturation').value;
+          const sealer = document.getElementById('rct-sealer').value;
+          const tempMat = document.getElementById('rct-tempMaterial').value;
+          const postop = document.getElementById('rct-postop').value;
+          const notesRCT = document.getElementById('rct-notes').value.trim();
+          // Prescription selections for root canal
+          const rctAntibiotic = document.getElementById('rct-antibiotic').value;
+          // Gather multiple analgesics via checkboxes
+          const rctAnalgesics = getCheckedValues('rct-analgesic-');
+          // Build prescription list
+          const rctPrescriptions = [];
+          if (rctAntibiotic && rctAntibiotic !== 'none') {
+            if (rctAntibiotic === 'Amoxicillin') {
+              rctPrescriptions.push('Amoxicillin 500 mg – take one capsule three times daily for 7 days (21 capsules, no refills)');
+            } else if (rctAntibiotic === 'Clindamycin') {
+              rctPrescriptions.push('Clindamycin 300 mg – take one capsule three times daily for 7 days (21 capsules, no refills)');
+            } else {
+              rctPrescriptions.push(rctAntibiotic);
+            }
+          }
+          if (rctAnalgesics.length) {
+            rctAnalgesics.forEach(a => rctPrescriptions.push(a));
+          }
+          // Compose paragraphs
+          const prcts = [];
+          // Basic info
+          let r1 = `${date}:`;
+          if (responsible) r1 += ` Responsible party: ${responsible}.`;
+          if (healthHistory) r1 += ` Health history: ${healthHistory}.`;
+          if (chief) r1 += ` Chief complaint: \"${chief}\".`;
+          if (bp) r1 += ` BP: ${bp} mmHg.`;
+          if (pulse) r1 += ` Pulse: ${pulse} bpm.`;
+          // General info is handled globally; do not include in root canal paragraphs
+          // Anesthesia and procedure
+          let r2 = '';
+          const anesthesiaSentenceRCT = buildAnesthesiaSentence('rct-anesthesia', carpules);
+          if (anesthesiaSentenceRCT) r2 += `${anesthesiaSentenceRCT} `;
+          r2 += `Root canal therapy was completed on tooth/teeth ${teeth ? teeth : 'N/A'}. `;
+          r2 += `The tooth was isolated using ${isolation}. Working length was determined with ${working}. `;
+          r2 += `Canals were irrigated with ${irrigant} and obturated via ${obturation} technique using ${sealer} sealer. `;
+          r2 += `A temporary restoration was placed using ${tempMat}. `;
+          r2 += `Post‑operative instructions: ${postop}.`;
+          prcts.push(r2.trim());
+          // Prescriptions
+          if (rctPrescriptions.length) {
+            prcts.push(`Prescriptions provided: ${rctPrescriptions.join('; ')}.`);
+          }
+          // Additional notes
+          if (notesRCT) prcts.push(`Additional notes: ${notesRCT}.`);
+          // Append paragraphs after a blank line
+          if (prcts.length) {
+            note += '\n\n' + prcts.join('\n\n');
+          }
+          // Append global additional documentation for root canal
+          const extrasRCT = [];
+          // Include radiographic and pre‑op information from the global section
+          if (radioDetails) extrasRCT.push(`Radiographic details: ${radioDetails}.`);
+          if (preOpDetails) extrasRCT.push(`Pre‑operative findings: ${preOpDetails}.`);
+          // Build an informed consent paragraph for root canal therapy
+          let consentParagraphRCT = '';
+          if (consentDetails) {
+            consentParagraphRCT = `Informed consent: ${consentDetails}.`;
+          } else {
+            consentParagraphRCT = `Discussed risks, benefits and alternatives of root canal therapy. Patient verbalized understanding and consented to proceed.`;
+            // If local anesthesia was administered, add a note about anesthesia risks
+            if (anesthesiaSentenceRCT) {
+              consentParagraphRCT += ` Potential risks of local anesthesia (allergic reaction, paresthesia, etc.) were explained and accepted.`;
+            }
+          }
+          extrasRCT.push(consentParagraphRCT.trim());
+          // Post‑operative evaluation and behavior
+          if (postOpDetails) extrasRCT.push(`Post‑operative evaluation & behavior: ${postOpDetails}.`);
+          // Follow‑up plan
+          if (followUpPlan) extrasRCT.push(`Follow‑up plan: ${followUpPlan}.`);
+          // Append extras to the note
+          if (extrasRCT.length) {
+            note += '\n\n' + extrasRCT.join('\n\n');
+          }
+          break;
+        }
+        case 'crownPrep': {
+          const teeth = document.getElementById('prep-teeth').value.trim();
+          const carpules = document.getElementById('prep-carpules').value;
+          const isolation = document.getElementById('prep-isolation').value;
+          const prepType = document.getElementById('prep-type').value;
+          const impression = document.getElementById('prep-impression').value;
+          const tempMat = document.getElementById('prep-tempMaterial').value;
+          const shade = document.getElementById('prep-shade').value;
+          const material = document.getElementById('prep-material').value;
+          const occlusion = document.getElementById('prep-occlusion').value;
+          const postop = document.getElementById('prep-postop').value;
+          const notesPrep = document.getElementById('prep-notes').value.trim();
+          const prepAntibiotic = document.getElementById('prep-antibiotic').value;
+          const prepAnalgesics = getCheckedValues('prep-analgesic-');
+          // Build prescription list
+          const prepPrescriptions = [];
+          if (prepAntibiotic && prepAntibiotic !== 'none') {
+            if (prepAntibiotic === 'Amoxicillin') {
+              prepPrescriptions.push('Amoxicillin 500 mg – take one capsule three times daily for 7 days (21 capsules, no refills)');
+            } else if (prepAntibiotic === 'Clindamycin') {
+              prepPrescriptions.push('Clindamycin 300 mg – take one capsule three times daily for 7 days (21 capsules, no refills)');
+            } else {
+              prepPrescriptions.push(prepAntibiotic);
+            }
+          }
+          if (prepAnalgesics.length) {
+            prepAnalgesics.forEach(a => prepPrescriptions.push(a));
+          }
+          // Compose paragraphs
+          const cpParas = [];
+          // General info is handled globally; skip adding it here
+          // Procedure paragraph
+          let c2 = '';
+          const anesthesiaSentencePrep = buildAnesthesiaSentence('prep-anesthesia', carpules);
+          if (anesthesiaSentencePrep) c2 += `${anesthesiaSentencePrep} `;
+          c2 += `Crown preparation was completed for tooth/teeth ${teeth ? teeth : 'N/A'}. `;
+          c2 += `Isolation achieved using ${isolation}. The preparation type was ${prepType}. `;
+          c2 += `Crown material selected: ${material}. `;
+          c2 += `An impression was taken via ${impression}, and a temporary crown fabricated using ${tempMat} with shade ${shade}. `;
+          c2 += `A ceramic bur was used to expose crown preparation margins for scanning purposes, and Hemodent was used to control hemostasis. `;
+          c2 += `Occlusion was ${occlusion === 'yes' ? 'checked and adjusted' : 'left unchanged'}. `;
+          c2 += `Post‑operative instructions: ${postop}.`;
+          cpParas.push(c2.trim());
+          // Prescriptions paragraph
+          if (prepPrescriptions.length) cpParas.push(`Prescriptions provided: ${prepPrescriptions.join('; ')}.`);
+          // Additional notes
+          if (notesPrep) cpParas.push(`Additional notes: ${notesPrep}.`);
+          if (cpParas.length) {
+            note += '\n\n' + cpParas.join('\n\n');
+          }
+          // Append global additional documentation for crown preparation
+          const extrasPrep = [];
+          // Radiographic and pre‑operative details from global input
+          if (radioDetails) extrasPrep.push(`Radiographic details: ${radioDetails}.`);
+          if (preOpDetails) extrasPrep.push(`Pre‑operative findings: ${preOpDetails}.`);
+          // Build an informed consent paragraph for crown preparation
+          let consentParagraphPrep = '';
+          if (consentDetails) {
+            consentParagraphPrep = `Informed consent: ${consentDetails}.`;
+          } else {
+            consentParagraphPrep = `Discussed risks, benefits and alternatives of crown preparation. Patient verbalized understanding and consented to proceed.`;
+            // If local anesthesia was administered, include anesthesia risks
+            if (anesthesiaSentencePrep) {
+              consentParagraphPrep += ` Potential risks of local anesthesia (allergic reaction, paresthesia, etc.) were explained and accepted.`;
+            }
+          }
+          extrasPrep.push(consentParagraphPrep.trim());
+          // Post‑operative evaluation and behavior
+          if (postOpDetails) extrasPrep.push(`Post‑operative evaluation & behavior: ${postOpDetails}.`);
+          // Follow‑up plan
+          if (followUpPlan) extrasPrep.push(`Follow‑up plan: ${followUpPlan}.`);
+          // Append extras to the note
+          if (extrasPrep.length) {
+            note += '\n\n' + extrasPrep.join('\n\n');
+          }
+          break;
+        }
+        case 'dentureDelivery': {
+          const typeDent = document.getElementById('dentdel-type').value;
+          const fit = document.getElementById('dentdel-fit').value;
+          const occlusion = document.getElementById('dentdel-occlusion').value;
+          const adjusted = document.getElementById('dentdel-adjusted').value;
+          const postop = document.getElementById('dentdel-postop').value;
+          const notes = document.getElementById('dentdel-notes').value.trim();
+          note += `Dentures delivered (${typeDent}). Fit/retention: ${fit}. Occlusion: ${occlusion}. Pressure areas adjusted: ${adjusted}. `;
+          note += `Post‑delivery instructions given: ${postop}.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+        case 'dentureFollowUp': {
+          const typeDent = document.getElementById('dentfu-type').value;
+          const issues = document.getElementById('dentfu-issues').value.trim();
+          const adjustments = document.getElementById('dentfu-adjustments').value.trim();
+          const outcome = document.getElementById('dentfu-outcome').value;
+          const follow = document.getElementById('dentfu-followup').value;
+          const notes = document.getElementById('dentfu-notes').value.trim();
+          note += `Denture follow‑up for ${typeDent}. `;
+          if (issues) note += `Patient reported: ${issues}. `;
+          if (adjustments) note += `Adjustments made: ${adjustments}. `;
+          note += `Outcome: ${outcome}. Follow‑up needed: ${follow}.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+        case 'dentureAdjust': {
+          const typeDent = document.getElementById('dentadj-type').value;
+          const area = document.getElementById('dentadj-area').value.trim();
+          const outcome = document.getElementById('dentadj-outcome').value;
+          const follow = document.getElementById('dentadj-followup').value;
+          const notes = document.getElementById('dentadj-notes').value.trim();
+          note += `Denture adjustment performed for ${typeDent}. Area adjusted: ${area ? area : 'N/A'}. `;
+          note += `Outcome: ${outcome}. Follow‑up needed: ${follow}.`;
+          if (notes) note += ` Additional notes: ${notes}.`;
+          break;
+        }
+        case 'completeExam': {
+          // Gather values for comprehensive exam fields
+          const xrays = getCheckedValues('cex-xray-');
+          const xrayReviewed = document.getElementById('cex-xray-reviewed').value;
+          const xrayFind = document.getElementById('cex-xray-findings').value.trim();
+          const ocsNone = document.getElementById('cex-ocs-none').checked;
+          const ocsNotes = document.getElementById('cex-ocs-notes').value.trim();
+          const hnExam = document.getElementById('cex-hn').value.trim();
+          const occlusionClass = document.getElementById('cex-occlusion').value;
+          const cambraRisk = document.getElementById('cex-cambra-risk').value;
+          const cambraFactors = document.getElementById('cex-cambra-factors').value.trim();
+          const perioClass = document.getElementById('cex-perio-class').value;
+          const ohi = document.getElementById('cex-ohi').value;
+          const calculus = document.getElementById('cex-calculus').value;
+          const photos = document.getElementById('cex-photos').value;
+          const perioScreen = document.getElementById('cex-perio-screen').value;
+          const diagnodent = document.getElementById('cex-diagnodent').value.trim();
+          const treatmentNeeds = document.getElementById('cex-treatment-needs').value.trim();
+          const altOptions = document.getElementById('cex-alternative-options').value.trim();
+          const recSTM = document.getElementById('cex-recommended-stm').value.trim();
+          const plan = document.getElementById('cex-plan').value.trim();
+          const hygiene = document.getElementById('cex-hygiene').value;
+          const notesExtra = document.getElementById('cex-notes').value.trim();
+          // Build a cohesive narrative for the comprehensive exam
+          note += `Comprehensive dental examination performed. `;
+          // Radiographs taken
+          note += `X‑rays taken today: ${xrays.length ? xrays.join(', ') : 'none'}. `;
+          // X‑ray review and findings
+          note += `X‑rays reviewed with patient and doctor: ${xrayReviewed}. `;
+          if (xrayFind) note += `X‑ray findings included: ${xrayFind}. `;
+          // Visual oral cancer screening
+          if (ocsNone) {
+            note += `Visual oral cancer screening: no abnormal findings. `;
+          } else if (ocsNotes) {
+            note += `Visual oral cancer screening: ${ocsNotes}. `;
+          }
+          // Head & neck exam
+          if (hnExam) note += `Head and neck exam: ${hnExam}. `;
+          // Occlusion classification
+          note += `Occlusion classification: ${occlusionClass}. `;
+          // CAMBRA caries risk and factors
+          note += `Patient has a ${cambraRisk} caries risk`;
+          if (cambraFactors) note += ` with the following factors: ${cambraFactors}`;
+          note += `. `;
+          // Periodontal and hygiene status
+          note += `Perio classification: ${perioClass}. Current oral hygiene: ${ohi}. Calculus/tartar present: ${calculus}. `;
+          // Photos and periodontal screening
+          note += `Oral/facial photographic images: ${photos}. Periodontal screening completed today: ${perioScreen}. `;
+          // Diagnodent
+          if (diagnodent) note += `Decay diagnosed today using Diagnodent; teeth with positive readings: ${diagnodent}. `;
+          // Treatment needs and options
+          if (treatmentNeeds) note += `Treatment needs with diagnosis: ${treatmentNeeds}. `;
+          if (altOptions) note += `Alternative treatment options: ${altOptions}. `;
+          if (recSTM) note += `Recommended STM treatment: ${recSTM}. `;
+          if (plan) note += `Treatment plan summary: ${plan}. `;
+          // Hygiene instructions
+          note += `Hygiene instructions given: ${hygiene}. `;
+          // Additional notes
+          if (notesExtra) note += `Additional notes: ${notesExtra}.`;
+          break;
+        }
+        case 'limitedExam': {
+          // Limited / emergency exam note
+          const reason = document.getElementById('lem-reason').value.trim();
+          const teeth = document.getElementById('lem-teeth').value.trim();
+          const findings = document.getElementById('lem-findings').value.trim();
+          const radios = getCheckedValues('lem-radio-');
+          const diagnosis = document.getElementById('lem-diagnosis').value.trim();
+          const treatment = document.getElementById('lem-treatment').value.trim();
+          const antibiotic = document.getElementById('lem-antibiotic').value;
+          const analgesics = getCheckedValues('lem-analgesic-');
+          const followup = document.getElementById('lem-followup').value.trim();
+          const notesLEM = document.getElementById('lem-notes').value.trim();
+          note += `Limited/emergency exam`;
+          if (reason) note += ` for ${reason}`;
+          note += `. `;
+          if (teeth) note += `Tooth/teeth involved: ${teeth}. `;
+          if (findings) note += `Symptoms/findings: ${findings}. `;
+          if (radios.length) note += `Radiographic interpretation: ${radios.join(', ')}. `;
+          if (diagnosis) note += `Diagnosis: ${diagnosis}. `;
+          if (treatment) note += `Treatment provided: ${treatment}. `;
+          const lemPrescriptions = [];
+          if (antibiotic && antibiotic !== 'none') {
+            if (antibiotic === 'Amoxicillin') {
+              lemPrescriptions.push('Amoxicillin 500 mg – take one capsule three times daily for 7 days (21 capsules, no refills)');
+            } else if (antibiotic === 'Clindamycin') {
+              lemPrescriptions.push('Clindamycin 300 mg – take one capsule three times daily for 7 days (21 capsules, no refills)');
+            } else {
+              lemPrescriptions.push(antibiotic);
+            }
+          }
+          if (analgesics.length) {
+            analgesics.forEach(a => {
+              lemPrescriptions.push(`${a}`);
+            });
+          }
+          if (lemPrescriptions.length) {
+            note += `Prescriptions provided: ${lemPrescriptions.join('; ')}. `;
+          }
+          if (followup) note += `Follow‑up and recommendations: ${followup}. `;
+          if (notesLEM) note += `Additional notes: ${notesLEM}.`;
+          break;
+        }
+        default: {
+          note += `No appointment details entered.`;
+        }
+      }
+      // Append generic extra paragraphs for appointment types beyond filling/extraction
+      if (type && type !== 'filling' && type !== 'extraction') {
+        const extraParas = [];
+        // Radiographic details
+        if (radioDetails) extraParas.push(`Radiographic details: ${radioDetails}.`);
+        // Pre‑operative findings
+        if (preOpDetails) extraParas.push(`Pre‑operative findings: ${preOpDetails}.`);
+        // Construct a consent paragraph
+        let consentPara = '';
+        if (consentDetails) {
+          consentPara = `Informed consent: ${consentDetails}.`;
+        } else {
+          // Determine procedure name based on appointment type
+          let procName;
+          switch (type) {
+            case 'crownCement': procName = 'crown cementation'; break;
+            case 'crownPrep': procName = 'crown preparation'; break;
+            case 'rootCanal': procName = 'root canal treatment'; break;
+            case 'invisalignStart': procName = 'Invisalign start'; break;
+            case 'invisalignRecheck': procName = 'Invisalign recheck'; break;
+            case 'invisalignAttachment': procName = 'Invisalign attachment/bonding'; break;
+            case 'prp': procName = 'PRP procedure'; break;
+            case 'consultation': procName = 'consultation'; break;
+            case 'implant': procName = 'implant placement'; break;
+            case 'limitedExam': procName = 'limited/emergency exam'; break;
+            case 'completeExam': procName = 'complete exam'; break;
+            case 'dentureDelivery': procName = 'denture delivery'; break;
+            case 'dentureFollowUp': procName = 'denture follow‑up'; break;
+            case 'dentureAdjust': procName = 'denture adjustment'; break;
+            default: procName = 'dental procedure';
+          }
+          consentPara = `Discussed risks, benefits and alternatives of ${procName}. Patient verbalized understanding and consented to proceed.`;
+        }
+        extraParas.push(consentPara.trim());
+        // Post‑operative evaluation
+        if (postOpDetails) extraParas.push(`Post‑operative evaluation & behavior: ${postOpDetails}.`);
+        // Follow‑up plan
+        if (followUpPlan) extraParas.push(`Follow‑up plan: ${followUpPlan}.`);
+        if (extraParas.length) {
+          note += '\n\n' + extraParas.join('\n\n');
+        }
+      }
+      document.getElementById('outputNote').value = note.trim();
+    });
+  </script>
+</body>
+</html>
